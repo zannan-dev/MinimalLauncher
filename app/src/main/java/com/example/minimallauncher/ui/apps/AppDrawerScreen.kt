@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,6 +26,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,10 +59,29 @@ fun AppDrawerScreen(
     val focusManager = LocalFocusManager.current
     val isImeVisible = WindowInsets.isImeVisible
     var wasImeVisible by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
 
-    LaunchedEffect(autoOpenKeyboard) {
+    val isAtTop by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+        }
+    }
+
+    LaunchedEffect(Unit) {
         if (autoOpenKeyboard) {
             focusRequester.requestFocus()
+        }
+    }
+
+    LaunchedEffect(isAtTop) {
+        if (isAtTop && autoOpenKeyboard && !isImeVisible) {
+            focusRequester.requestFocus()
+        }
+    }
+
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress && !isAtTop) {
+            focusManager.clearFocus()
         }
     }
 
@@ -68,7 +89,7 @@ fun AppDrawerScreen(
         if (isImeVisible) {
             wasImeVisible = true
         } else if (wasImeVisible) {
-            focusManager.clearFocus()
+            // focusManager.clearFocus() // Remove this line
             wasImeVisible = false
         }
     }
@@ -101,7 +122,10 @@ fun AppDrawerScreen(
             filteredApps.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("No matching apps")
             }
-            else -> LazyColumn(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
+            else -> LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f).padding(top = 8.dp)
+            ) {
                 items(filteredApps, key = { app -> app.key }) { app ->
                     AppDrawerRow(
                         app = app,
