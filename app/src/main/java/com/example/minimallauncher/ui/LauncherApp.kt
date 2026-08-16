@@ -36,6 +36,12 @@ fun LauncherApp(
     val currentScreen = LauncherScreen.valueOf(currentScreenName)
     val openHome = { currentScreenName = LauncherScreen.HOME.name }
 
+    androidx.compose.runtime.LaunchedEffect(viewModel) {
+        viewModel.homeEvents.collect {
+            openHome()
+        }
+    }
+
     BackHandler(enabled = currentScreen != LauncherScreen.HOME, onBack = openHome)
 
     val view = LocalView.current

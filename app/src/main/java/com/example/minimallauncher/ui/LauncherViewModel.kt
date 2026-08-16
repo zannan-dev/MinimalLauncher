@@ -11,8 +11,11 @@ import com.example.minimallauncher.data.preferences.LauncherPreferencesRepositor
 import com.example.minimallauncher.data.preferences.ThemePreference
 import com.example.minimallauncher.domain.LaunchableApp
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
@@ -25,6 +28,13 @@ class LauncherViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LauncherUiState())
     val uiState: StateFlow<LauncherUiState> = _uiState.asStateFlow()
+
+    private val _homeEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val homeEvents: SharedFlow<Unit> = _homeEvents.asSharedFlow()
+
+    fun onHomePressed() {
+        _homeEvents.tryEmit(Unit)
+    }
 
     init {
         viewModelScope.launch {

@@ -45,4 +45,11 @@ class MainActivity : ComponentActivity() {
         runCatching { startActivity(intent) }
             .getOrElse { startActivity(Intent(Settings.ACTION_SETTINGS)) }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_HOME)) {
+            viewModel.onHomePressed()
+        }
+    }
 }
