@@ -41,6 +41,12 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         }
     }
 
+    override suspend fun setAutoOpenKeyboard(enabled: Boolean) {
+        applicationContext.launcherDataStore.edit { values ->
+            values[AUTO_OPEN_KEYBOARD] = enabled
+        }
+    }
+
     override suspend fun setTheme(theme: ThemePreference) {
         applicationContext.launcherDataStore.edit { values ->
             values[THEME] = theme.name
@@ -56,6 +62,7 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
     private fun Preferences.toLauncherPreferences(defaultUse24HourClock: Boolean) = LauncherPreferences(
         use24HourClock = this[USE_24_HOUR_CLOCK] ?: defaultUse24HourClock,
         showDate = this[SHOW_DATE] ?: true,
+        autoOpenKeyboard = this[AUTO_OPEN_KEYBOARD] ?: true,
         theme = ThemePreference.fromStorage(this[THEME]),
         favoriteAppKeys = this[FAVORITE_APP_KEYS].orEmpty(),
     )
@@ -63,6 +70,7 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
     private companion object {
         val USE_24_HOUR_CLOCK = booleanPreferencesKey("use_24_hour_clock")
         val SHOW_DATE = booleanPreferencesKey("show_date")
+        val AUTO_OPEN_KEYBOARD = booleanPreferencesKey("auto_open_keyboard")
         val THEME = stringPreferencesKey("theme")
         val FAVORITE_APP_KEYS = stringSetPreferencesKey("favorite_app_keys")
     }

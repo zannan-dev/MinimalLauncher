@@ -29,10 +29,12 @@ import com.example.minimallauncher.domain.LaunchableApp
 fun SettingsScreen(
     use24HourClock: Boolean,
     showDate: Boolean,
+    autoOpenKeyboard: Boolean,
     theme: ThemePreference,
     favoriteApps: List<LaunchableApp>,
     onUse24HourClockChanged: (Boolean) -> Unit,
     onShowDateChanged: (Boolean) -> Unit,
+    onAutoOpenKeyboardChanged: (Boolean) -> Unit,
     onThemeChanged: (ThemePreference) -> Unit,
     onRemoveFavorite: (LaunchableApp) -> Unit,
     onOpenDefaultLauncherSettings: () -> Unit,
@@ -50,6 +52,11 @@ fun SettingsScreen(
                     title = "Show date",
                     checked = showDate,
                     onCheckedChange = onShowDateChanged,
+                )
+                PreferenceToggle(
+                    title = "Auto-open keyboard in app drawer",
+                    checked = autoOpenKeyboard,
+                    onCheckedChange = onAutoOpenKeyboardChanged,
                 )
                 HorizontalDivider()
                 Text("Theme", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 20.dp, bottom = 4.dp))

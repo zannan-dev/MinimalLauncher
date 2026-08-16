@@ -71,6 +71,12 @@ class LauncherViewModel(
         }
     }
 
+    fun setAutoOpenKeyboard(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setAutoOpenKeyboard(enabled)
+        }
+    }
+
     fun setTheme(theme: ThemePreference) {
         viewModelScope.launch {
             preferencesRepository.setTheme(theme)

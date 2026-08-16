@@ -9,6 +9,7 @@ data class LauncherUiState(
     val preferences: LauncherPreferences = LauncherPreferences(
         use24HourClock = false,
         showDate = true,
+        autoOpenKeyboard = true,
         theme = ThemePreference.SYSTEM,
         favoriteAppKeys = emptySet(),
     ),

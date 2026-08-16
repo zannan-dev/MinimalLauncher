@@ -46,18 +46,22 @@ fun LauncherApp(
                     LauncherScreen.APPS -> AppDrawerScreen(
                         apps = state.apps,
                         favoriteKeys = state.preferences.favoriteAppKeys,
+                        autoOpenKeyboard = state.preferences.autoOpenKeyboard,
                         isLoading = state.isLoadingApps,
                         failedToLoad = state.appLoadError,
+                        onBack = openHome,
                         onLaunchApp = viewModel::launchApp,
                         onToggleFavorite = viewModel::toggleFavorite,
                     )
                     LauncherScreen.SETTINGS -> SettingsScreen(
                         use24HourClock = state.preferences.use24HourClock,
                         showDate = state.preferences.showDate,
+                        autoOpenKeyboard = state.preferences.autoOpenKeyboard,
                         theme = state.preferences.theme,
                         favoriteApps = state.favoriteApps,
                         onUse24HourClockChanged = viewModel::setUse24HourClock,
                         onShowDateChanged = viewModel::setShowDate,
+                        onAutoOpenKeyboardChanged = viewModel::setAutoOpenKeyboard,
                         onThemeChanged = viewModel::setTheme,
                         onRemoveFavorite = viewModel::toggleFavorite,
                         onOpenDefaultLauncherSettings = onOpenDefaultLauncherSettings,

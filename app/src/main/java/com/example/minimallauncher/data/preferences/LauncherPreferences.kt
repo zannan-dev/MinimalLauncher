@@ -4,6 +4,7 @@ package com.example.minimallauncher.data.preferences
 data class LauncherPreferences(
     val use24HourClock: Boolean,
     val showDate: Boolean,
+    val autoOpenKeyboard: Boolean,
     val theme: ThemePreference,
     val favoriteAppKeys: Set<String>,
 )
