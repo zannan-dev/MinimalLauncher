@@ -45,13 +45,11 @@ import com.example.minimallauncher.domain.filterApps
 @Composable
 fun AppDrawerScreen(
     apps: List<LaunchableApp>,
-    favoriteKeys: Set<String>,
     autoOpenKeyboard: Boolean,
     isLoading: Boolean,
     failedToLoad: Boolean,
     onBack: () -> Unit,
     onLaunchApp: (LaunchableApp) -> Unit,
-    onToggleFavorite: (LaunchableApp) -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val filteredApps by remember(apps, query) { mutableStateOf(filterApps(apps, query)) }
@@ -76,7 +74,6 @@ fun AppDrawerScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Text("Apps", style = MaterialTheme.typography.titleLarge)
         TextField(
             value = query,
             onValueChange = { query = it },
@@ -108,9 +105,7 @@ fun AppDrawerScreen(
                 items(filteredApps, key = { app -> app.key }) { app ->
                     AppDrawerRow(
                         app = app,
-                        isFavorite = app.key in favoriteKeys,
                         onLaunchApp = onLaunchApp,
-                        onToggleFavorite = onToggleFavorite,
                     )
                 }
             }
@@ -121,9 +116,7 @@ fun AppDrawerScreen(
 @Composable
 private fun AppDrawerRow(
     app: LaunchableApp,
-    isFavorite: Boolean,
     onLaunchApp: (LaunchableApp) -> Unit,
-    onToggleFavorite: (LaunchableApp) -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -139,8 +132,5 @@ private fun AppDrawerRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).padding(start = 16.dp, end = 16.dp),
         )
-        TextButton(onClick = { onToggleFavorite(app) }) {
-            Text(if (isFavorite) "Remove" else "Add")
-        }
     }
 }

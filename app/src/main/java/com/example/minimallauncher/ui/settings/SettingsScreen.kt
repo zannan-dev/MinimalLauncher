@@ -31,12 +31,10 @@ fun SettingsScreen(
     showDate: Boolean,
     autoOpenKeyboard: Boolean,
     theme: ThemePreference,
-    favoriteApps: List<LaunchableApp>,
     onUse24HourClockChanged: (Boolean) -> Unit,
     onShowDateChanged: (Boolean) -> Unit,
     onAutoOpenKeyboardChanged: (Boolean) -> Unit,
     onThemeChanged: (ThemePreference) -> Unit,
-    onRemoveFavorite: (LaunchableApp) -> Unit,
     onOpenDefaultLauncherSettings: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -65,18 +63,6 @@ fun SettingsScreen(
                         TextButton(onClick = { onThemeChanged(choice) }) {
                             Text(if (choice == theme) "• ${choice.label}" else choice.label)
                         }
-                    }
-                }
-                HorizontalDivider()
-                Text("Favorite apps", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 20.dp, bottom = 4.dp))
-            }
-            if (favoriteApps.isEmpty()) {
-                item { Text("Add apps from the app drawer.", modifier = Modifier.padding(vertical = 12.dp)) }
-            } else {
-                items(favoriteApps, key = { app -> app.key }) { app ->
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Text(app.label, modifier = Modifier.weight(1f).padding(vertical = 8.dp))
-                        TextButton(onClick = { onRemoveFavorite(app) }) { Text("Remove") }
                     }
                 }
             }

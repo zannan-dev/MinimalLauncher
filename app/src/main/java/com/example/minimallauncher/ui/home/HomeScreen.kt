@@ -41,7 +41,6 @@ import java.util.Locale
 fun HomeScreen(
     use24HourClock: Boolean,
     showDate: Boolean,
-    favorites: List<LaunchableApp>,
     onOpenDrawer: () -> Unit,
     onOpenSettings: () -> Unit,
     onLaunchApp: (LaunchableApp) -> Unit,
@@ -90,39 +89,8 @@ fun HomeScreen(
         }
         Spacer(Modifier.height(32.dp))
 
-        if (favorites.isEmpty()) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text("Add favorites from the app drawer", textAlign = TextAlign.Center)
-            }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                userScrollEnabled = false,
-                modifier = Modifier.weight(1f),
-            ) {
-                items(favorites, key = { app -> app.key }) { app ->
-                    TextButton(
-                        onClick = { onLaunchApp(app) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(64.dp),
-                    ) {
-                        Text(
-                            text = app.label,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-            }
-        }
+        Spacer(Modifier.height(32.dp))
+        Box(Modifier.weight(1f)) {}
 
         TextButton(onClick = onOpenDrawer, modifier = Modifier.height(48.dp)) {
             Text("All apps")
