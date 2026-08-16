@@ -103,6 +103,7 @@ fun HomeScreen(
                 contentPadding = PaddingValues(vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
+                userScrollEnabled = false,
                 modifier = Modifier.weight(1f),
             ) {
                 items(favorites, key = { app -> app.key }) { app ->
