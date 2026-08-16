@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import com.example.minimallauncher.platform.InstalledAppsChangeObserver
 import com.example.minimallauncher.ui.LauncherApp
@@ -19,6 +20,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         appsChangeObserver = InstalledAppsChangeObserver(this, viewModel::refreshApps)
         setContent {
             LauncherApp(
