@@ -1,5 +1,6 @@
 package com.example.minimallauncher.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,10 +38,15 @@ fun SettingsScreen(
     onThemeChanged: (ThemePreference) -> Unit,
     onOpenDefaultLauncherSettings: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Text("Settings", style = MaterialTheme.typography.titleLarge)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text(
+            text = "Settings",
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.padding(start = 24.dp, top = 32.dp, bottom = 16.dp)
+        )
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
             item {
+                SettingsSectionTitle("General")
                 PreferenceToggle(
                     title = "24-hour clock",
                     checked = use24HourClock,
@@ -56,24 +62,35 @@ fun SettingsScreen(
                     checked = autoOpenKeyboard,
                     onCheckedChange = onAutoOpenKeyboardChanged,
                 )
-                HorizontalDivider()
-                Text("Theme", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 20.dp, bottom = 4.dp))
-                Row {
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                SettingsSectionTitle("Theme")
+                Row(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 16.dp)) {
                     ThemePreference.entries.forEach { choice ->
-                        TextButton(onClick = { onThemeChanged(choice) }) {
+                        TextButton(
+                            onClick = { onThemeChanged(choice) },
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
                             Text(if (choice == theme) "• ${choice.label}" else choice.label)
                         }
                     }
                 }
-            }
-            item {
-                HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
-                TextButton(onClick = onOpenDefaultLauncherSettings, modifier = Modifier.padding(top = 12.dp)) {
-                    Text("Default launcher settings")
-                }
-                HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
-                Text("About", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 20.dp, bottom = 4.dp))
-                Text("Minimal Launcher is an offline, distraction-free Android home screen.")
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                SettingsSectionTitle("System")
+                PreferenceRow(
+                    title = "Default launcher settings",
+                    onClick = onOpenDefaultLauncherSettings
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                SettingsSectionTitle("About")
+                Text(
+                    text = "Minimal Launcher is an offline, distraction-free Android home screen.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 24.dp)
+                )
             }
         }
     }
@@ -87,6 +104,16 @@ private val ThemePreference.label: String
     }
 
 @Composable
+private fun SettingsSectionTitle(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 24.dp, top = 16.dp, bottom = 8.dp)
+    )
+}
+
+@Composable
 private fun PreferenceToggle(
     title: String,
     checked: Boolean,
@@ -98,10 +125,26 @@ private fun PreferenceToggle(
             .fillMaxWidth()
             .semantics { role = Role.Switch }
             .toggleable(value = checked, onValueChange = onCheckedChange)
-            .padding(vertical = 12.dp),
+            .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
-        Text(title, modifier = Modifier.weight(1f))
+        Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.width(16.dp))
         Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+@Composable
+private fun PreferenceRow(
+    title: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+    ) {
+        Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
     }
 }
