@@ -31,7 +31,6 @@ fun SettingsScreen(
     showDate: Boolean,
     theme: ThemePreference,
     favoriteApps: List<LaunchableApp>,
-    onBack: () -> Unit,
     onUse24HourClockChanged: (Boolean) -> Unit,
     onShowDateChanged: (Boolean) -> Unit,
     onThemeChanged: (ThemePreference) -> Unit,
@@ -39,10 +38,7 @@ fun SettingsScreen(
     onOpenDefaultLauncherSettings: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text("Back") }
-            Text("Settings", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 8.dp))
-        }
+        Text("Settings", style = MaterialTheme.typography.titleLarge)
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
             item {
                 PreferenceToggle(

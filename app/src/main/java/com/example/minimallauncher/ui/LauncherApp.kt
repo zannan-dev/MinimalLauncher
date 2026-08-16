@@ -48,7 +48,6 @@ fun LauncherApp(
                         favoriteKeys = state.preferences.favoriteAppKeys,
                         isLoading = state.isLoadingApps,
                         failedToLoad = state.appLoadError,
-                        onBack = openHome,
                         onLaunchApp = viewModel::launchApp,
                         onToggleFavorite = viewModel::toggleFavorite,
                     )
@@ -57,7 +56,6 @@ fun LauncherApp(
                         showDate = state.preferences.showDate,
                         theme = state.preferences.theme,
                         favoriteApps = state.favoriteApps,
-                        onBack = openHome,
                         onUse24HourClockChanged = viewModel::setUse24HourClock,
                         onShowDateChanged = viewModel::setShowDate,
                         onThemeChanged = viewModel::setTheme,

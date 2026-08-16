@@ -37,7 +37,6 @@ fun AppDrawerScreen(
     favoriteKeys: Set<String>,
     isLoading: Boolean,
     failedToLoad: Boolean,
-    onBack: () -> Unit,
     onLaunchApp: (LaunchableApp) -> Unit,
     onToggleFavorite: (LaunchableApp) -> Unit,
 ) {
@@ -45,10 +44,7 @@ fun AppDrawerScreen(
     val filteredApps by remember(apps, query) { mutableStateOf(filterApps(apps, query)) }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            TextButton(onClick = onBack) { Text("Back") }
-            Text("Apps", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 8.dp))
-        }
+        Text("Apps", style = MaterialTheme.typography.titleLarge)
         TextField(
             value = query,
             onValueChange = { query = it },
