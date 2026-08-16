@@ -24,6 +24,9 @@ android {
             optimization {
                 enable = false
             }
+            // For personal use, we can use the debug signing configuration
+            // to avoid managing a separate release keystore.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
