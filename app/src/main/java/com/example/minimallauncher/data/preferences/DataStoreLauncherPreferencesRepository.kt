@@ -5,12 +5,15 @@ import android.text.format.DateFormat
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.minimallauncher.domain.toggledFavorite
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import java.io.IOException
 
 private const val PREFERENCES_FILE_NAME = "launcher_preferences"
 private val Context.launcherDataStore by preferencesDataStore(name = PREFERENCES_FILE_NAME)
@@ -18,9 +21,13 @@ private val Context.launcherDataStore by preferencesDataStore(name = PREFERENCES
 class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPreferencesRepository {
     private val applicationContext = context.applicationContext
 
-    override val preferences: Flow<LauncherPreferences> = applicationContext.launcherDataStore.data.map { values ->
-        values.toLauncherPreferences(defaultUse24HourClock = DateFormat.is24HourFormat(applicationContext))
-    }
+    override val preferences: Flow<LauncherPreferences> = applicationContext.launcherDataStore.data
+        .catch { error ->
+            if (error is IOException) emit(emptyPreferences()) else throw error
+        }
+        .map { values ->
+            values.toLauncherPreferences(defaultUse24HourClock = DateFormat.is24HourFormat(applicationContext))
+        }
 
     override suspend fun setUse24HourClock(enabled: Boolean) {
         applicationContext.launcherDataStore.edit { values ->
