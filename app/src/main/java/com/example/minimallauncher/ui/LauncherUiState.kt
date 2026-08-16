@@ -11,6 +11,7 @@ data class LauncherUiState(
         showDate = true,
         autoOpenKeyboard = true,
         doubleTapToLock = true,
+        showStatusBar = false,
         theme = ThemePreference.SYSTEM,
         favoriteAppKeys = emptySet(),
     ),

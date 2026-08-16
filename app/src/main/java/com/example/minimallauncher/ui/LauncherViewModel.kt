@@ -83,6 +83,12 @@ class LauncherViewModel(
         }
     }
 
+    fun setShowStatusBar(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setShowStatusBar(enabled)
+        }
+    }
+
     fun setTheme(theme: ThemePreference) {
         viewModelScope.launch {
             preferencesRepository.setTheme(theme)

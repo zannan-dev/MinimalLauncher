@@ -53,6 +53,12 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         }
     }
 
+    override suspend fun setShowStatusBar(enabled: Boolean) {
+        applicationContext.launcherDataStore.edit { values ->
+            values[SHOW_STATUS_BAR] = enabled
+        }
+    }
+
     override suspend fun setTheme(theme: ThemePreference) {
         applicationContext.launcherDataStore.edit { values ->
             values[THEME] = theme.name
@@ -70,6 +76,7 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         showDate = this[SHOW_DATE] ?: true,
         autoOpenKeyboard = this[AUTO_OPEN_KEYBOARD] ?: true,
         doubleTapToLock = this[DOUBLE_TAP_TO_LOCK] ?: true,
+        showStatusBar = this[SHOW_STATUS_BAR] ?: false,
         theme = ThemePreference.fromStorage(this[THEME]),
         favoriteAppKeys = this[FAVORITE_APP_KEYS].orEmpty(),
     )
@@ -79,6 +86,7 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         val SHOW_DATE = booleanPreferencesKey("show_date")
         val AUTO_OPEN_KEYBOARD = booleanPreferencesKey("auto_open_keyboard")
         val DOUBLE_TAP_TO_LOCK = booleanPreferencesKey("double_tap_to_lock")
+        val SHOW_STATUS_BAR = booleanPreferencesKey("show_status_bar")
         val THEME = stringPreferencesKey("theme")
         val FAVORITE_APP_KEYS = stringSetPreferencesKey("favorite_app_keys")
     }

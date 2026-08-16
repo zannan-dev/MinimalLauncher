@@ -6,6 +6,7 @@ data class LauncherPreferences(
     val showDate: Boolean,
     val autoOpenKeyboard: Boolean,
     val doubleTapToLock: Boolean,
+    val showStatusBar: Boolean,
     val theme: ThemePreference,
     val favoriteAppKeys: Set<String>,
 )

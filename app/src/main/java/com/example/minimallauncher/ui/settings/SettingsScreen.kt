@@ -32,11 +32,13 @@ fun SettingsScreen(
     showDate: Boolean,
     autoOpenKeyboard: Boolean,
     doubleTapToLock: Boolean,
+    showStatusBar: Boolean,
     theme: ThemePreference,
     onUse24HourClockChanged: (Boolean) -> Unit,
     onShowDateChanged: (Boolean) -> Unit,
     onAutoOpenKeyboardChanged: (Boolean) -> Unit,
     onDoubleTapToLockChanged: (Boolean) -> Unit,
+    onShowStatusBarChanged: (Boolean) -> Unit,
     onThemeChanged: (ThemePreference) -> Unit,
     onOpenDefaultLauncherSettings: () -> Unit,
 ) {
@@ -68,6 +70,11 @@ fun SettingsScreen(
                     title = "Double tap to lock screen",
                     checked = doubleTapToLock,
                     onCheckedChange = onDoubleTapToLockChanged,
+                )
+                PreferenceToggle(
+                    title = "Show status bar",
+                    checked = showStatusBar,
+                    onCheckedChange = onShowStatusBarChanged,
                 )
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
