@@ -8,6 +8,7 @@ interface LauncherPreferencesRepository {
     suspend fun setUse24HourClock(enabled: Boolean)
     suspend fun setShowDate(enabled: Boolean)
     suspend fun setAutoOpenKeyboard(enabled: Boolean)
+    suspend fun setDoubleTapToLock(enabled: Boolean)
     suspend fun setTheme(theme: ThemePreference)
     suspend fun toggleFavorite(appKey: String)
 }

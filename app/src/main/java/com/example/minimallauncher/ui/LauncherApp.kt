@@ -38,6 +38,7 @@ fun LauncherApp(
                     LauncherScreen.HOME -> HomeScreen(
                         use24HourClock = state.preferences.use24HourClock,
                         showDate = state.preferences.showDate,
+                        doubleTapToLock = state.preferences.doubleTapToLock,
                         onOpenDrawer = { currentScreenName = LauncherScreen.APPS.name },
                         onOpenSettings = { currentScreenName = LauncherScreen.SETTINGS.name },
                         onLaunchApp = viewModel::launchApp,
@@ -54,10 +55,12 @@ fun LauncherApp(
                         use24HourClock = state.preferences.use24HourClock,
                         showDate = state.preferences.showDate,
                         autoOpenKeyboard = state.preferences.autoOpenKeyboard,
+                        doubleTapToLock = state.preferences.doubleTapToLock,
                         theme = state.preferences.theme,
                         onUse24HourClockChanged = viewModel::setUse24HourClock,
                         onShowDateChanged = viewModel::setShowDate,
                         onAutoOpenKeyboardChanged = viewModel::setAutoOpenKeyboard,
+                        onDoubleTapToLockChanged = viewModel::setDoubleTapToLock,
                         onThemeChanged = viewModel::setTheme,
                         onOpenDefaultLauncherSettings = onOpenDefaultLauncherSettings,
                     )

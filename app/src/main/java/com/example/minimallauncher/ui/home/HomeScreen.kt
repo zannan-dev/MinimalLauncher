@@ -1,5 +1,8 @@
 package com.example.minimallauncher.ui.home
 
+import android.content.Intent
+import android.provider.Settings
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,11 +28,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.minimallauncher.LauncherAccessibilityService
 import com.example.minimallauncher.domain.LaunchableApp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -41,6 +46,7 @@ import java.util.Locale
 fun HomeScreen(
     use24HourClock: Boolean,
     showDate: Boolean,
+    doubleTapToLock: Boolean,
     onOpenDrawer: () -> Unit,
     onOpenSettings: () -> Unit,
     onLaunchApp: (LaunchableApp) -> Unit,
@@ -53,6 +59,7 @@ fun HomeScreen(
         }
     }
     var upwardDrag by remember { mutableStateOf(0f) }
+    val context = LocalContext.current
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -68,6 +75,18 @@ fun HomeScreen(
                         }
                     },
                     onDragEnd = { upwardDrag = 0f },
+                )
+            }
+            .pointerInput(onOpenSettings) {
+                detectTapGestures(
+                    onLongPress = { onOpenSettings() },
+                    onDoubleTap = {
+                        if (doubleTapToLock) {
+                            if (!LauncherAccessibilityService.lockScreen()) {
+                                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                            }
+                        }
+                    }
                 )
             }
             .padding(horizontal = 24.dp, vertical = 32.dp),
@@ -91,12 +110,5 @@ fun HomeScreen(
 
         Spacer(Modifier.height(32.dp))
         Box(Modifier.weight(1f)) {}
-
-        TextButton(onClick = onOpenDrawer, modifier = Modifier.height(48.dp)) {
-            Text("All apps")
-        }
-        TextButton(onClick = onOpenSettings, modifier = Modifier.height(48.dp)) {
-            Text("Settings")
-        }
     }
 }

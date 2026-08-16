@@ -77,6 +77,12 @@ class LauncherViewModel(
         }
     }
 
+    fun setDoubleTapToLock(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setDoubleTapToLock(enabled)
+        }
+    }
+
     fun setTheme(theme: ThemePreference) {
         viewModelScope.launch {
             preferencesRepository.setTheme(theme)

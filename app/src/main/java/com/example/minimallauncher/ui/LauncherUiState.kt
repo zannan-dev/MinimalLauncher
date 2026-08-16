@@ -10,6 +10,7 @@ data class LauncherUiState(
         use24HourClock = false,
         showDate = true,
         autoOpenKeyboard = true,
+        doubleTapToLock = true,
         theme = ThemePreference.SYSTEM,
         favoriteAppKeys = emptySet(),
     ),

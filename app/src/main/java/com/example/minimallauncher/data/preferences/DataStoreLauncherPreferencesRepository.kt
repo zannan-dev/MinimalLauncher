@@ -47,6 +47,12 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         }
     }
 
+    override suspend fun setDoubleTapToLock(enabled: Boolean) {
+        applicationContext.launcherDataStore.edit { values ->
+            values[DOUBLE_TAP_TO_LOCK] = enabled
+        }
+    }
+
     override suspend fun setTheme(theme: ThemePreference) {
         applicationContext.launcherDataStore.edit { values ->
             values[THEME] = theme.name
@@ -63,6 +69,7 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         use24HourClock = this[USE_24_HOUR_CLOCK] ?: defaultUse24HourClock,
         showDate = this[SHOW_DATE] ?: true,
         autoOpenKeyboard = this[AUTO_OPEN_KEYBOARD] ?: true,
+        doubleTapToLock = this[DOUBLE_TAP_TO_LOCK] ?: true,
         theme = ThemePreference.fromStorage(this[THEME]),
         favoriteAppKeys = this[FAVORITE_APP_KEYS].orEmpty(),
     )
@@ -71,6 +78,7 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         val USE_24_HOUR_CLOCK = booleanPreferencesKey("use_24_hour_clock")
         val SHOW_DATE = booleanPreferencesKey("show_date")
         val AUTO_OPEN_KEYBOARD = booleanPreferencesKey("auto_open_keyboard")
+        val DOUBLE_TAP_TO_LOCK = booleanPreferencesKey("double_tap_to_lock")
         val THEME = stringPreferencesKey("theme")
         val FAVORITE_APP_KEYS = stringSetPreferencesKey("favorite_app_keys")
     }

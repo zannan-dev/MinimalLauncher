@@ -31,10 +31,12 @@ fun SettingsScreen(
     use24HourClock: Boolean,
     showDate: Boolean,
     autoOpenKeyboard: Boolean,
+    doubleTapToLock: Boolean,
     theme: ThemePreference,
     onUse24HourClockChanged: (Boolean) -> Unit,
     onShowDateChanged: (Boolean) -> Unit,
     onAutoOpenKeyboardChanged: (Boolean) -> Unit,
+    onDoubleTapToLockChanged: (Boolean) -> Unit,
     onThemeChanged: (ThemePreference) -> Unit,
     onOpenDefaultLauncherSettings: () -> Unit,
 ) {
@@ -61,6 +63,11 @@ fun SettingsScreen(
                     title = "Auto-open keyboard in app drawer",
                     checked = autoOpenKeyboard,
                     onCheckedChange = onAutoOpenKeyboardChanged,
+                )
+                PreferenceToggle(
+                    title = "Double tap to lock screen",
+                    checked = doubleTapToLock,
+                    onCheckedChange = onDoubleTapToLockChanged,
                 )
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
