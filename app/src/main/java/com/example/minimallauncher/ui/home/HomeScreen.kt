@@ -1,5 +1,7 @@
 package com.example.minimallauncher.ui.home
 
+import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -42,6 +44,19 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+@SuppressLint("WrongConstant")
+private fun expandNotifications(context: Context): Boolean {
+    return try {
+        val statusBarService = context.getSystemService("statusbar")
+        val statusBarManager = Class.forName("android.app.StatusBarManager")
+        val method = statusBarManager.getMethod("expandNotificationsPanel")
+        method.invoke(statusBarService)
+        true
+    } catch (_: Exception) {
+        false
+    }
+}
+
 @Composable
 fun HomeScreen(
     use24HourClock: Boolean,
@@ -58,7 +73,7 @@ fun HomeScreen(
             delay(1_000)
         }
     }
-    var upwardDrag by remember { mutableStateOf(0f) }
+    var verticalDrag by remember { mutableStateOf(0f) }
     val context = LocalContext.current
 
     Column(
@@ -68,13 +83,16 @@ fun HomeScreen(
             .pointerInput(onOpenDrawer) {
                 detectVerticalDragGestures(
                     onVerticalDrag = { _, dragAmount ->
-                        upwardDrag += dragAmount
-                        if (upwardDrag < -72f) {
+                        verticalDrag += dragAmount
+                        if (verticalDrag < -72f) {
                             onOpenDrawer()
-                            upwardDrag = 0f
+                            verticalDrag = 0f
+                        } else if (verticalDrag > 72f) {
+                            expandNotifications(context)
+                            verticalDrag = 0f
                         }
                     },
-                    onDragEnd = { upwardDrag = 0f },
+                    onDragEnd = { verticalDrag = 0f },
                 )
             }
             .pointerInput(onOpenSettings) {
