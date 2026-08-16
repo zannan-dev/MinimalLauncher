@@ -30,7 +30,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.minimallauncher.domain.LaunchableApp
 import com.example.minimallauncher.domain.filterApps
-import com.example.minimallauncher.ui.components.AppIcon
 
 @Composable
 fun AppDrawerScreen(
@@ -96,12 +95,11 @@ private fun AppDrawerRow(
             .clickable { onLaunchApp(app) }
             .padding(vertical = 8.dp),
     ) {
-        AppIcon(app = app, modifier = Modifier.size(40.dp))
         Text(
             text = app.label,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
+            modifier = Modifier.weight(1f).padding(start = 16.dp, end = 16.dp),
         )
         TextButton(onClick = { onToggleFavorite(app) }) {
             Text(if (isFavorite) "Remove" else "Add")
