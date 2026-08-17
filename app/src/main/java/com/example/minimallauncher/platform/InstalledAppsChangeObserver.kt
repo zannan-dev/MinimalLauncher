@@ -1,48 +1,37 @@
 package com.example.minimallauncher.platform
 
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.os.Build
-import androidx.core.content.ContextCompat
+import android.content.pm.LauncherApps
+import android.os.UserHandle
 
 /**
- * Observes package changes only while the activity is alive. This avoids a background service while
- * ensuring the app drawer reflects installs, removals, and updates without a manual restart.
+ * Observes package changes using the native LauncherApps API. This ensures instant
+ * updates across all profiles (including Work Profiles) without needing background services.
  */
 class InstalledAppsChangeObserver(
-    private val context: Context,
+    context: Context,
     private val onAppsChanged: () -> Unit,
 ) {
+    private val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
     private var isRegistered = false
-    private val receiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            onAppsChanged()
-        }
+
+    private val callback = object : LauncherApps.Callback() {
+        override fun onPackageAdded(packageName: String, user: UserHandle) = onAppsChanged()
+        override fun onPackageRemoved(packageName: String, user: UserHandle) = onAppsChanged()
+        override fun onPackageChanged(packageName: String, user: UserHandle) = onAppsChanged()
+        override fun onPackagesAvailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) = onAppsChanged()
+        override fun onPackagesUnavailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) = onAppsChanged()
     }
 
     fun start() {
         if (isRegistered) return
-
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_PACKAGE_ADDED)
-            addAction(Intent.ACTION_PACKAGE_REMOVED)
-            addAction(Intent.ACTION_PACKAGE_CHANGED)
-            addDataScheme("package")
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
-        } else {
-            @Suppress("DEPRECATION")
-            context.registerReceiver(receiver, filter)
-        }
+        launcherApps.registerCallback(callback)
         isRegistered = true
     }
 
     fun stop() {
         if (!isRegistered) return
-        context.unregisterReceiver(receiver)
+        launcherApps.unregisterCallback(callback)
         isRegistered = false
     }
 }
