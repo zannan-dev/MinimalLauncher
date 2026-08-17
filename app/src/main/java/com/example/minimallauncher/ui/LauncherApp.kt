@@ -84,7 +84,6 @@ fun LauncherApp(
                         onLaunchApp = {
                             viewModel.launchApp(pendingApp)
                             appPendingLaunch = null
-                            openHome()
                         },
                         onCancel = {
                             appPendingLaunch = null

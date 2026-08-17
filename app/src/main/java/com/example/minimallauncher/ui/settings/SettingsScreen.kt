@@ -19,8 +19,14 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.layout.height
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -57,6 +63,8 @@ fun SettingsScreen(
     onThemeChanged: (ThemePreference) -> Unit,
     onOpenDefaultLauncherSettings: () -> Unit,
 ) {
+    var showAdvancedBreaks by remember { mutableStateOf(false) }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
             text = "Settings",
@@ -94,31 +102,23 @@ fun SettingsScreen(
 
                 PreferenceToggle(
                     title = "Intentional Pilot",
+                    subtitle = "Add a mindful breathing delay before opening distracting apps",
                     checked = isIntentionalPilotEnabled,
                     onCheckedChange = onIntentionalPilotEnabledChanged,
                 )
                 if (isIntentionalPilotEnabled) {
                     PreferenceRow(
-                        title = "Select apps...",
+                        title = "Select apps to delay",
+                        subtitle = "Choose which apps require you to pause and breathe.",
                         onClick = onSelectIntentionalPilotApps
                     )
-                    
-                    Text(
-                        text = "Delay duration",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 24.dp, top = 8.dp, bottom = 4.dp)
+                    DurationSettingRow(
+                        title = "Breathing Delay",
+                        currentValue = intentionalPilotDelaySeconds,
+                        valueRange = 3f..30f,
+                        unit = "sec",
+                        onValueChanged = onIntentionalPilotDelayChanged
                     )
-                    Row(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 16.dp)) {
-                        listOf(3, 5, 10, 15).forEach { delay ->
-                            TextButton(
-                                onClick = { onIntentionalPilotDelayChanged(delay) },
-                                modifier = Modifier.padding(end = 8.dp)
-                            ) {
-                                Text(if (delay == intentionalPilotDelaySeconds) "• ${delay}s" else "${delay}s")
-                            }
-                        }
-                    }
                 }
 
                 PreferenceToggle(
@@ -127,9 +127,36 @@ fun SettingsScreen(
                     onCheckedChange = onFlowZoneEnabledChanged,
                 )
                 if (isFlowZoneEnabled) {
-                    DurationSettingRow("Flow Duration", flowZoneFocusMinutes, 1f..90f, onFlowZoneFocusMinutesChanged)
-                    DurationSettingRow("Short Break", flowZoneBreakMinutes, 1f..30f, onFlowZoneBreakMinutesChanged)
-                    DurationSettingRow("Long Break", flowZoneLongBreakMinutes, 1f..60f, onFlowZoneLongBreakMinutesChanged)
+                    DurationSettingRow(
+                        title = "Flow Duration",
+                        currentValue = flowZoneFocusMinutes,
+                        valueRange = 1f..90f,
+                        unit = "min",
+                        onValueChanged = onFlowZoneFocusMinutesChanged
+                    )
+                    
+                    PreferenceRow(
+                        title = if (showAdvancedBreaks) "Hide break settings" else "Customize breaks",
+                        subtitle = if (!showAdvancedBreaks) "$flowZoneBreakMinutes min short, $flowZoneLongBreakMinutes min long" else null,
+                        onClick = { showAdvancedBreaks = !showAdvancedBreaks }
+                    )
+                    
+                    if (showAdvancedBreaks) {
+                        DurationSettingRow(
+                            title = "Short Break",
+                            currentValue = flowZoneBreakMinutes,
+                            valueRange = 1f..30f,
+                            unit = "min",
+                            onValueChanged = onFlowZoneBreakMinutesChanged
+                        )
+                        DurationSettingRow(
+                            title = "Long Break",
+                            currentValue = flowZoneLongBreakMinutes,
+                            valueRange = 1f..60f,
+                            unit = "min",
+                            onValueChanged = onFlowZoneLongBreakMinutesChanged
+                        )
+                    }
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -185,6 +212,7 @@ private fun SettingsSectionTitle(title: String) {
 @Composable
 private fun PreferenceToggle(
     title: String,
+    subtitle: String? = null,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
@@ -196,7 +224,17 @@ private fun PreferenceToggle(
             .toggleable(value = checked, onValueChange = onCheckedChange)
             .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
-        Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
         Spacer(Modifier.width(16.dp))
         Switch(checked = checked, onCheckedChange = null)
     }
@@ -205,16 +243,24 @@ private fun PreferenceToggle(
 @Composable
 private fun PreferenceRow(
     title: String,
+    subtitle: String? = null,
     onClick: () -> Unit,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
-        Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        Text(title, style = MaterialTheme.typography.bodyLarge)
+        if (subtitle != null) {
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
     }
 }
 
@@ -223,6 +269,7 @@ private fun DurationSettingRow(
     title: String,
     currentValue: Int,
     valueRange: ClosedFloatingPointRange<Float>,
+    unit: String = "min",
     onValueChanged: (Int) -> Unit,
 ) {
     Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
@@ -233,7 +280,7 @@ private fun DurationSettingRow(
         ) {
             Text(text = title, style = MaterialTheme.typography.bodyLarge)
             Text(
-                text = "$currentValue min",
+                text = "$currentValue $unit",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary
             )

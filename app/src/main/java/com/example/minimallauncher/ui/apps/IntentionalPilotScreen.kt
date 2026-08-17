@@ -1,10 +1,7 @@
 package com.example.minimallauncher.ui.apps
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -19,10 +16,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,10 +31,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.minimallauncher.domain.LaunchableApp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun IntentionalPilotScreen(
@@ -46,20 +47,10 @@ fun IntentionalPilotScreen(
     onCancel: () -> Unit,
 ) {
     var remainingSeconds by remember { mutableStateOf(delaySeconds) }
-    var instructionText by remember { mutableStateOf("Breathe in...") }
+    var breathPhase by remember { mutableStateOf("Get ready") }
+    var phaseSecondsLeft by remember { mutableStateOf(3) }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "breathing")
-    
-    // Core breathing cycle (0.0 to 1.0)
-    val breathingProgress by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "breathing_progress"
-    )
+    val breathingProgress = remember { Animatable(0f) }
 
     LaunchedEffect(delaySeconds) {
         remainingSeconds = delaySeconds
@@ -69,11 +60,39 @@ fun IntentionalPilotScreen(
         }
     }
     
-    LaunchedEffect(breathingProgress) {
-        if (breathingProgress > 0.95f) {
-            instructionText = "Breathe out..."
-        } else if (breathingProgress < 0.05f) {
-            instructionText = "Breathe in..."
+    LaunchedEffect(Unit) {
+        launch {
+            breathPhase = "Get ready"
+            for (i in 3 downTo 1) {
+                phaseSecondsLeft = i
+                delay(1000L)
+            }
+            while (true) {
+                breathPhase = "Inhale"
+                for (i in 4 downTo 1) {
+                    phaseSecondsLeft = i
+                    delay(1000L)
+                }
+                breathPhase = "Exhale"
+                for (i in 7 downTo 1) {
+                    phaseSecondsLeft = i
+                    delay(1000L)
+                }
+            }
+        }
+        
+        launch {
+            delay(3000L)
+            while (true) {
+                breathingProgress.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 4000, easing = FastOutSlowInEasing)
+                )
+                breathingProgress.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(durationMillis = 7000, easing = FastOutSlowInEasing)
+                )
+            }
         }
     }
 
@@ -81,71 +100,100 @@ fun IntentionalPilotScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = instructionText,
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
+            Spacer(modifier = Modifier.height(48.dp))
 
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(240.dp)
-                    .padding(bottom = 32.dp)
+                    .fillMaxWidth()
+                    .weight(1f)
             ) {
                 // Outer ring
                 Box(
                     modifier = Modifier
-                        .size(240.dp)
-                        .scale(0.8f + (breathingProgress * 0.2f))
-                        .alpha(0.1f + (breathingProgress * 0.1f))
+                        .size(340.dp)
+                        .scale(0.85f + (breathingProgress.value * 0.2f))
+                        .alpha(0.05f + (breathingProgress.value * 0.1f))
                         .background(color = MaterialTheme.colorScheme.primary, shape = CircleShape)
                 )
                 // Middle ring
                 Box(
                     modifier = Modifier
-                        .size(200.dp)
-                        .scale(0.7f + (breathingProgress * 0.3f))
-                        .alpha(0.2f + (breathingProgress * 0.15f))
+                        .size(280.dp)
+                        .scale(0.8f + (breathingProgress.value * 0.3f))
+                        .alpha(0.1f + (breathingProgress.value * 0.15f))
                         .background(color = MaterialTheme.colorScheme.primary, shape = CircleShape)
                 )
                 // Inner ring
                 Box(
                     modifier = Modifier
-                        .size(160.dp)
-                        .scale(0.6f + (breathingProgress * 0.4f))
-                        .alpha(0.3f + (breathingProgress * 0.2f))
+                        .size(220.dp)
+                        .scale(0.75f + (breathingProgress.value * 0.4f))
+                        .alpha(0.2f + (breathingProgress.value * 0.2f))
                         .background(color = MaterialTheme.colorScheme.primary, shape = CircleShape)
+                )
+
+                Text(
+                    text = "$breathPhase\n$phaseSecondsLeft",
+                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Light),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .alpha(0.9f)
+                        .scale(0.85f + (breathingProgress.value * 0.15f))
                 )
             }
 
-            Text(
-                text = "What is the purpose of opening ${app.label}?\nIs it necessary?",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 16.dp),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(bottom = 24.dp)
             ) {
-                TextButton(onClick = onCancel) {
-                    Text("No")
-                }
-                Button(
-                    onClick = onLaunchApp,
-                    enabled = remainingSeconds == 0
+                Text(
+                    text = "Do you really need to open ${app.label}?",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = 8.dp).alpha(0.9f),
+                    textAlign = TextAlign.Center
+                )
+                
+                Text(
+                    text = "Take a moment to decide.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 40.dp).alpha(0.7f),
+                    textAlign = TextAlign.Center
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(if (remainingSeconds > 0) remainingSeconds.toString() else "Yes")
+                    OutlinedButton(
+                        onClick = onCancel,
+                        modifier = Modifier.weight(1f).height(56.dp)
+                    ) {
+                        Text("No, go back", fontSize = 16.sp)
+                    }
+                    Button(
+                        onClick = onLaunchApp,
+                        enabled = remainingSeconds == 0,
+                        modifier = Modifier.weight(1f).height(56.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Text(
+                            text = if (remainingSeconds > 0) "Wait ($remainingSeconds)" else "Yes, open",
+                            fontSize = 16.sp
+                        )
+                    }
                 }
             }
         }
