@@ -94,13 +94,18 @@ fun LauncherApp(
                 } else {
                     when (currentScreen) {
                         LauncherScreen.HOME -> HomeScreen(
-                        use24HourClock = state.preferences.use24HourClock,
-                        showDate = state.preferences.showDate,
-                        doubleTapToLock = state.preferences.doubleTapToLock,
-                        onOpenDrawer = { currentScreenName = LauncherScreen.APPS.name },
-                        onOpenSettings = { currentScreenName = LauncherScreen.SETTINGS.name },
-                        onLaunchApp = handleAppLaunch,
-                    )
+                            use24HourClock = state.preferences.use24HourClock,
+                            showDate = state.preferences.showDate,
+                            doubleTapToLock = state.preferences.doubleTapToLock,
+                            isFlowZoneEnabled = state.preferences.isFlowZoneEnabled,
+                            flowZoneState = state.flowZoneState,
+                            onToggleFlowZoneTimer = viewModel::toggleFlowZoneTimer,
+                            onSkipFlowZonePhase = viewModel::skipFlowZonePhase,
+                            onResetFlowZone = viewModel::resetFlowZone,
+                            onOpenDrawer = { currentScreenName = LauncherScreen.APPS.name },
+                            onOpenSettings = { currentScreenName = LauncherScreen.SETTINGS.name },
+                            onLaunchApp = handleAppLaunch,
+                        )
                     LauncherScreen.APPS -> AppDrawerScreen(
                         apps = state.apps,
                         autoOpenKeyboard = state.preferences.autoOpenKeyboard,
@@ -117,6 +122,10 @@ fun LauncherApp(
                         showStatusBar = state.preferences.showStatusBar,
                         isIntentionalPilotEnabled = state.preferences.isIntentionalPilotEnabled,
                         intentionalPilotDelaySeconds = state.preferences.intentionalPilotDelaySeconds,
+                        isFlowZoneEnabled = state.preferences.isFlowZoneEnabled,
+                        flowZoneFocusMinutes = state.preferences.flowZoneFocusMinutes,
+                        flowZoneBreakMinutes = state.preferences.flowZoneBreakMinutes,
+                        flowZoneLongBreakMinutes = state.preferences.flowZoneLongBreakMinutes,
                         theme = state.preferences.theme,
                         onUse24HourClockChanged = viewModel::setUse24HourClock,
                         onShowDateChanged = viewModel::setShowDate,
@@ -126,6 +135,10 @@ fun LauncherApp(
                         onIntentionalPilotEnabledChanged = viewModel::setIntentionalPilotEnabled,
                         onIntentionalPilotDelayChanged = viewModel::setIntentionalPilotDelaySeconds,
                         onSelectIntentionalPilotApps = { currentScreenName = LauncherScreen.INTENTIONAL_PILOT_APPS.name },
+                        onFlowZoneEnabledChanged = viewModel::setFlowZoneEnabled,
+                        onFlowZoneFocusMinutesChanged = viewModel::setFlowZoneFocusMinutes,
+                        onFlowZoneBreakMinutesChanged = viewModel::setFlowZoneBreakMinutes,
+                        onFlowZoneLongBreakMinutesChanged = viewModel::setFlowZoneLongBreakMinutes,
                         onThemeChanged = viewModel::setTheme,
                         onOpenDefaultLauncherSettings = onOpenDefaultLauncherSettings,
                     )

@@ -62,6 +62,11 @@ fun HomeScreen(
     use24HourClock: Boolean,
     showDate: Boolean,
     doubleTapToLock: Boolean,
+    isFlowZoneEnabled: Boolean,
+    flowZoneState: com.example.minimallauncher.ui.FlowZoneState,
+    onToggleFlowZoneTimer: () -> Unit,
+    onSkipFlowZonePhase: () -> Unit,
+    onResetFlowZone: () -> Unit,
     onOpenDrawer: () -> Unit,
     onOpenSettings: () -> Unit,
     onLaunchApp: (LaunchableApp) -> Unit,
@@ -130,6 +135,16 @@ fun HomeScreen(
         Spacer(Modifier.height(32.dp))
 
         Spacer(Modifier.height(32.dp))
+
+        if (isFlowZoneEnabled) {
+            FlowZoneTimer(
+                state = flowZoneState,
+                onToggleTimer = onToggleFlowZoneTimer,
+                onSkipPhase = onSkipFlowZonePhase,
+                onReset = onResetFlowZone
+            )
+        }
+
         Box(Modifier.weight(1f)) {}
     }
 }

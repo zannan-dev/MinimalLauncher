@@ -1,6 +1,7 @@
 package com.example.minimallauncher.ui.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +14,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +37,10 @@ fun SettingsScreen(
     showStatusBar: Boolean,
     isIntentionalPilotEnabled: Boolean,
     intentionalPilotDelaySeconds: Int,
+    isFlowZoneEnabled: Boolean,
+    flowZoneFocusMinutes: Int,
+    flowZoneBreakMinutes: Int,
+    flowZoneLongBreakMinutes: Int,
     theme: ThemePreference,
     onUse24HourClockChanged: (Boolean) -> Unit,
     onShowDateChanged: (Boolean) -> Unit,
@@ -44,6 +50,10 @@ fun SettingsScreen(
     onIntentionalPilotEnabledChanged: (Boolean) -> Unit,
     onIntentionalPilotDelayChanged: (Int) -> Unit,
     onSelectIntentionalPilotApps: () -> Unit,
+    onFlowZoneEnabledChanged: (Boolean) -> Unit,
+    onFlowZoneFocusMinutesChanged: (Int) -> Unit,
+    onFlowZoneBreakMinutesChanged: (Int) -> Unit,
+    onFlowZoneLongBreakMinutesChanged: (Int) -> Unit,
     onThemeChanged: (ThemePreference) -> Unit,
     onOpenDefaultLauncherSettings: () -> Unit,
 ) {
@@ -109,6 +119,17 @@ fun SettingsScreen(
                             }
                         }
                     }
+                }
+
+                PreferenceToggle(
+                    title = "Flow Zone (Pomodoro)",
+                    checked = isFlowZoneEnabled,
+                    onCheckedChange = onFlowZoneEnabledChanged,
+                )
+                if (isFlowZoneEnabled) {
+                    DurationSettingRow("Flow Duration", flowZoneFocusMinutes, 1f..90f, onFlowZoneFocusMinutesChanged)
+                    DurationSettingRow("Short Break", flowZoneBreakMinutes, 1f..30f, onFlowZoneBreakMinutesChanged)
+                    DurationSettingRow("Long Break", flowZoneLongBreakMinutes, 1f..60f, onFlowZoneLongBreakMinutesChanged)
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -194,5 +215,34 @@ private fun PreferenceRow(
             .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
         Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun DurationSettingRow(
+    title: String,
+    currentValue: Int,
+    valueRange: ClosedFloatingPointRange<Float>,
+    onValueChanged: (Int) -> Unit,
+) {
+    Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "$currentValue min",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Slider(
+            value = currentValue.toFloat(),
+            onValueChange = { onValueChanged(it.toInt()) },
+            valueRange = valueRange,
+            modifier = Modifier.padding(top = 4.dp)
+        )
     }
 }

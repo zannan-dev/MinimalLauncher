@@ -12,6 +12,10 @@ data class LauncherPreferences(
     val isIntentionalPilotEnabled: Boolean,
     val intentionalPilotAppKeys: Set<String>,
     val intentionalPilotDelaySeconds: Int,
+    val isFlowZoneEnabled: Boolean,
+    val flowZoneFocusMinutes: Int,
+    val flowZoneBreakMinutes: Int,
+    val flowZoneLongBreakMinutes: Int,
 )
 
 enum class ThemePreference {

@@ -15,4 +15,8 @@ interface LauncherPreferencesRepository {
     suspend fun toggleFavorite(appKey: String)
     suspend fun toggleIntentionalPilotApp(appKey: String)
     suspend fun setIntentionalPilotDelaySeconds(seconds: Int)
+    suspend fun setFlowZoneEnabled(enabled: Boolean)
+    suspend fun setFlowZoneFocusMinutes(minutes: Int)
+    suspend fun setFlowZoneBreakMinutes(minutes: Int)
+    suspend fun setFlowZoneLongBreakMinutes(minutes: Int)
 }

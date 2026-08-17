@@ -89,6 +89,30 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         }
     }
 
+    override suspend fun setFlowZoneEnabled(enabled: Boolean) {
+        applicationContext.launcherDataStore.edit { values ->
+            values[FLOW_ZONE_ENABLED] = enabled
+        }
+    }
+
+    override suspend fun setFlowZoneFocusMinutes(minutes: Int) {
+        applicationContext.launcherDataStore.edit { values ->
+            values[FLOW_ZONE_FOCUS] = minutes
+        }
+    }
+
+    override suspend fun setFlowZoneBreakMinutes(minutes: Int) {
+        applicationContext.launcherDataStore.edit { values ->
+            values[FLOW_ZONE_BREAK] = minutes
+        }
+    }
+
+    override suspend fun setFlowZoneLongBreakMinutes(minutes: Int) {
+        applicationContext.launcherDataStore.edit { values ->
+            values[FLOW_ZONE_LONG_BREAK] = minutes
+        }
+    }
+
     private fun Preferences.toLauncherPreferences(defaultUse24HourClock: Boolean) = LauncherPreferences(
         use24HourClock = this[USE_24_HOUR_CLOCK] ?: defaultUse24HourClock,
         showDate = this[SHOW_DATE] ?: true,
@@ -100,6 +124,10 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         isIntentionalPilotEnabled = this[INTENTIONAL_PILOT] ?: false,
         intentionalPilotAppKeys = this[INTENTIONAL_PILOT_APP_KEYS].orEmpty(),
         intentionalPilotDelaySeconds = this[INTENTIONAL_PILOT_DELAY] ?: 5,
+        isFlowZoneEnabled = this[FLOW_ZONE_ENABLED] ?: false,
+        flowZoneFocusMinutes = this[FLOW_ZONE_FOCUS] ?: 25,
+        flowZoneBreakMinutes = this[FLOW_ZONE_BREAK] ?: 5,
+        flowZoneLongBreakMinutes = this[FLOW_ZONE_LONG_BREAK] ?: 15,
     )
 
     private companion object {
@@ -113,5 +141,9 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         val INTENTIONAL_PILOT = booleanPreferencesKey("intentional_pilot")
         val INTENTIONAL_PILOT_APP_KEYS = stringSetPreferencesKey("intentional_pilot_app_keys")
         val INTENTIONAL_PILOT_DELAY = androidx.datastore.preferences.core.intPreferencesKey("intentional_pilot_delay")
+        val FLOW_ZONE_ENABLED = booleanPreferencesKey("flow_zone_enabled")
+        val FLOW_ZONE_FOCUS = androidx.datastore.preferences.core.intPreferencesKey("flow_zone_focus")
+        val FLOW_ZONE_BREAK = androidx.datastore.preferences.core.intPreferencesKey("flow_zone_break")
+        val FLOW_ZONE_LONG_BREAK = androidx.datastore.preferences.core.intPreferencesKey("flow_zone_long_break")
     }
 }
