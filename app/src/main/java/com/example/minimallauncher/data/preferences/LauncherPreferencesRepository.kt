@@ -10,6 +10,9 @@ interface LauncherPreferencesRepository {
     suspend fun setAutoOpenKeyboard(enabled: Boolean)
     suspend fun setDoubleTapToLock(enabled: Boolean)
     suspend fun setShowStatusBar(enabled: Boolean)
+    suspend fun setIntentionalPilotEnabled(enabled: Boolean)
     suspend fun setTheme(theme: ThemePreference)
     suspend fun toggleFavorite(appKey: String)
+    suspend fun toggleIntentionalPilotApp(appKey: String)
+    suspend fun setIntentionalPilotDelaySeconds(seconds: Int)
 }

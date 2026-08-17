@@ -59,6 +59,12 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         }
     }
 
+    override suspend fun setIntentionalPilotEnabled(enabled: Boolean) {
+        applicationContext.launcherDataStore.edit { values ->
+            values[INTENTIONAL_PILOT] = enabled
+        }
+    }
+
     override suspend fun setTheme(theme: ThemePreference) {
         applicationContext.launcherDataStore.edit { values ->
             values[THEME] = theme.name
@@ -71,6 +77,18 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         }
     }
 
+    override suspend fun toggleIntentionalPilotApp(appKey: String) {
+        applicationContext.launcherDataStore.edit { values ->
+            values[INTENTIONAL_PILOT_APP_KEYS] = toggledFavorite(values[INTENTIONAL_PILOT_APP_KEYS].orEmpty(), appKey)
+        }
+    }
+
+    override suspend fun setIntentionalPilotDelaySeconds(seconds: Int) {
+        applicationContext.launcherDataStore.edit { values ->
+            values[INTENTIONAL_PILOT_DELAY] = seconds
+        }
+    }
+
     private fun Preferences.toLauncherPreferences(defaultUse24HourClock: Boolean) = LauncherPreferences(
         use24HourClock = this[USE_24_HOUR_CLOCK] ?: defaultUse24HourClock,
         showDate = this[SHOW_DATE] ?: true,
@@ -79,6 +97,9 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         showStatusBar = this[SHOW_STATUS_BAR] ?: false,
         theme = ThemePreference.fromStorage(this[THEME]),
         favoriteAppKeys = this[FAVORITE_APP_KEYS].orEmpty(),
+        isIntentionalPilotEnabled = this[INTENTIONAL_PILOT] ?: false,
+        intentionalPilotAppKeys = this[INTENTIONAL_PILOT_APP_KEYS].orEmpty(),
+        intentionalPilotDelaySeconds = this[INTENTIONAL_PILOT_DELAY] ?: 5,
     )
 
     private companion object {
@@ -89,5 +110,8 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         val SHOW_STATUS_BAR = booleanPreferencesKey("show_status_bar")
         val THEME = stringPreferencesKey("theme")
         val FAVORITE_APP_KEYS = stringSetPreferencesKey("favorite_app_keys")
+        val INTENTIONAL_PILOT = booleanPreferencesKey("intentional_pilot")
+        val INTENTIONAL_PILOT_APP_KEYS = stringSetPreferencesKey("intentional_pilot_app_keys")
+        val INTENTIONAL_PILOT_DELAY = androidx.datastore.preferences.core.intPreferencesKey("intentional_pilot_delay")
     }
 }

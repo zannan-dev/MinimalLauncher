@@ -9,6 +9,9 @@ data class LauncherPreferences(
     val showStatusBar: Boolean,
     val theme: ThemePreference,
     val favoriteAppKeys: Set<String>,
+    val isIntentionalPilotEnabled: Boolean,
+    val intentionalPilotAppKeys: Set<String>,
+    val intentionalPilotDelaySeconds: Int,
 )
 
 enum class ThemePreference {

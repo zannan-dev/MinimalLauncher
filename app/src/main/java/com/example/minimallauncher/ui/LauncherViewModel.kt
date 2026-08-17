@@ -69,6 +69,18 @@ class LauncherViewModel(
         }
     }
 
+    fun toggleIntentionalPilotApp(app: LaunchableApp) {
+        viewModelScope.launch {
+            preferencesRepository.toggleIntentionalPilotApp(app.key)
+        }
+    }
+
+    fun setIntentionalPilotDelaySeconds(seconds: Int) {
+        viewModelScope.launch {
+            preferencesRepository.setIntentionalPilotDelaySeconds(seconds)
+        }
+    }
+
     fun setUse24HourClock(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.setUse24HourClock(enabled)
@@ -96,6 +108,12 @@ class LauncherViewModel(
     fun setShowStatusBar(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.setShowStatusBar(enabled)
+        }
+    }
+
+    fun setIntentionalPilotEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setIntentionalPilotEnabled(enabled)
         }
     }
 

@@ -20,11 +20,14 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.minimallauncher.ui.apps.AppDrawerScreen
+import com.example.minimallauncher.ui.apps.IntentionalPilotAppSelectionScreen
+import com.example.minimallauncher.ui.apps.IntentionalPilotScreen
 import com.example.minimallauncher.ui.home.HomeScreen
+import com.example.minimallauncher.domain.LaunchableApp
 import com.example.minimallauncher.ui.settings.SettingsScreen
 import com.example.minimallauncher.ui.theme.LauncherTheme
 
-private enum class LauncherScreen { HOME, APPS, SETTINGS }
+private enum class LauncherScreen { HOME, APPS, SETTINGS, INTENTIONAL_PILOT_APPS }
 
 @Composable
 fun LauncherApp(
@@ -35,6 +38,15 @@ fun LauncherApp(
     var currentScreenName by rememberSaveable { mutableStateOf(LauncherScreen.HOME.name) }
     val currentScreen = LauncherScreen.valueOf(currentScreenName)
     val openHome = { currentScreenName = LauncherScreen.HOME.name }
+    var appPendingLaunch by androidx.compose.runtime.remember { mutableStateOf<LaunchableApp?>(null) }
+
+    val handleAppLaunch: (LaunchableApp) -> Unit = { app ->
+        if (state.preferences.isIntentionalPilotEnabled && app.key in state.preferences.intentionalPilotAppKeys) {
+            appPendingLaunch = app
+        } else {
+            viewModel.launchApp(app)
+        }
+    }
 
     androidx.compose.runtime.LaunchedEffect(viewModel) {
         viewModel.homeEvents.collect {
@@ -64,14 +76,30 @@ fun LauncherApp(
                 Modifier.navigationBarsPadding().displayCutoutPadding()
             }
             Box(modifier = Modifier.fillMaxSize().then(paddingModifier)) {
-                when (currentScreen) {
-                    LauncherScreen.HOME -> HomeScreen(
+                val pendingApp = appPendingLaunch
+                if (pendingApp != null) {
+                    IntentionalPilotScreen(
+                        app = pendingApp,
+                        delaySeconds = state.preferences.intentionalPilotDelaySeconds,
+                        onLaunchApp = {
+                            viewModel.launchApp(pendingApp)
+                            appPendingLaunch = null
+                            openHome()
+                        },
+                        onCancel = {
+                            appPendingLaunch = null
+                            openHome()
+                        }
+                    )
+                } else {
+                    when (currentScreen) {
+                        LauncherScreen.HOME -> HomeScreen(
                         use24HourClock = state.preferences.use24HourClock,
                         showDate = state.preferences.showDate,
                         doubleTapToLock = state.preferences.doubleTapToLock,
                         onOpenDrawer = { currentScreenName = LauncherScreen.APPS.name },
                         onOpenSettings = { currentScreenName = LauncherScreen.SETTINGS.name },
-                        onLaunchApp = viewModel::launchApp,
+                        onLaunchApp = handleAppLaunch,
                     )
                     LauncherScreen.APPS -> AppDrawerScreen(
                         apps = state.apps,
@@ -79,7 +107,7 @@ fun LauncherApp(
                         isLoading = state.isLoadingApps,
                         failedToLoad = state.appLoadError,
                         onBack = openHome,
-                        onLaunchApp = viewModel::launchApp,
+                        onLaunchApp = handleAppLaunch,
                     )
                     LauncherScreen.SETTINGS -> SettingsScreen(
                         use24HourClock = state.preferences.use24HourClock,
@@ -87,15 +115,27 @@ fun LauncherApp(
                         autoOpenKeyboard = state.preferences.autoOpenKeyboard,
                         doubleTapToLock = state.preferences.doubleTapToLock,
                         showStatusBar = state.preferences.showStatusBar,
+                        isIntentionalPilotEnabled = state.preferences.isIntentionalPilotEnabled,
+                        intentionalPilotDelaySeconds = state.preferences.intentionalPilotDelaySeconds,
                         theme = state.preferences.theme,
                         onUse24HourClockChanged = viewModel::setUse24HourClock,
                         onShowDateChanged = viewModel::setShowDate,
                         onAutoOpenKeyboardChanged = viewModel::setAutoOpenKeyboard,
                         onDoubleTapToLockChanged = viewModel::setDoubleTapToLock,
                         onShowStatusBarChanged = viewModel::setShowStatusBar,
+                        onIntentionalPilotEnabledChanged = viewModel::setIntentionalPilotEnabled,
+                        onIntentionalPilotDelayChanged = viewModel::setIntentionalPilotDelaySeconds,
+                        onSelectIntentionalPilotApps = { currentScreenName = LauncherScreen.INTENTIONAL_PILOT_APPS.name },
                         onThemeChanged = viewModel::setTheme,
                         onOpenDefaultLauncherSettings = onOpenDefaultLauncherSettings,
                     )
+                    LauncherScreen.INTENTIONAL_PILOT_APPS -> IntentionalPilotAppSelectionScreen(
+                        apps = state.apps,
+                        selectedAppKeys = state.preferences.intentionalPilotAppKeys,
+                        onToggleApp = viewModel::toggleIntentionalPilotApp,
+                        onBack = { currentScreenName = LauncherScreen.SETTINGS.name },
+                    )
+                }
                 }
             }
         }

@@ -33,12 +33,17 @@ fun SettingsScreen(
     autoOpenKeyboard: Boolean,
     doubleTapToLock: Boolean,
     showStatusBar: Boolean,
+    isIntentionalPilotEnabled: Boolean,
+    intentionalPilotDelaySeconds: Int,
     theme: ThemePreference,
     onUse24HourClockChanged: (Boolean) -> Unit,
     onShowDateChanged: (Boolean) -> Unit,
     onAutoOpenKeyboardChanged: (Boolean) -> Unit,
     onDoubleTapToLockChanged: (Boolean) -> Unit,
     onShowStatusBarChanged: (Boolean) -> Unit,
+    onIntentionalPilotEnabledChanged: (Boolean) -> Unit,
+    onIntentionalPilotDelayChanged: (Int) -> Unit,
+    onSelectIntentionalPilotApps: () -> Unit,
     onThemeChanged: (ThemePreference) -> Unit,
     onOpenDefaultLauncherSettings: () -> Unit,
 ) {
@@ -76,6 +81,35 @@ fun SettingsScreen(
                     checked = showStatusBar,
                     onCheckedChange = onShowStatusBarChanged,
                 )
+
+                PreferenceToggle(
+                    title = "Intentional Pilot",
+                    checked = isIntentionalPilotEnabled,
+                    onCheckedChange = onIntentionalPilotEnabledChanged,
+                )
+                if (isIntentionalPilotEnabled) {
+                    PreferenceRow(
+                        title = "Select apps...",
+                        onClick = onSelectIntentionalPilotApps
+                    )
+                    
+                    Text(
+                        text = "Delay duration",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 24.dp, top = 8.dp, bottom = 4.dp)
+                    )
+                    Row(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 16.dp)) {
+                        listOf(3, 5, 10, 15).forEach { delay ->
+                            TextButton(
+                                onClick = { onIntentionalPilotDelayChanged(delay) },
+                                modifier = Modifier.padding(end = 8.dp)
+                            ) {
+                                Text(if (delay == intentionalPilotDelaySeconds) "• ${delay}s" else "${delay}s")
+                            }
+                        }
+                    }
+                }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 SettingsSectionTitle("Theme")
