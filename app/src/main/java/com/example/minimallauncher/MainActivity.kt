@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         appsChangeObserver.start()
+        viewModel.refreshApps()
     }
 
     override fun onStop() {

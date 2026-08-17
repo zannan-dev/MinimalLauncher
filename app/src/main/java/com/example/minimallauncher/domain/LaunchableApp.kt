@@ -11,8 +11,8 @@ data class LaunchableApp(
     val activityName: String,
     val label: String,
     val userHandle: UserHandle,
-    val isPinnedShortcut: Boolean = false,
+    val isPinnedShortcut: Boolean,
+    val isSystemApp: Boolean = false,
 ) {
-    val key: String
-        get() = "$packageName/$activityName/${userHandle.hashCode()}/$isPinnedShortcut"
+    val key = "${packageName}_${activityName}_${userHandle.hashCode()}_${isPinnedShortcut}"
 }

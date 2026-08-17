@@ -124,9 +124,68 @@ fun HomeScreen(
                 textAlign = TextAlign.Center,
             )
         }
+        
+        BatteryStatus()
+        
         Spacer(Modifier.height(32.dp))
 
         Spacer(Modifier.height(32.dp))
         Box(Modifier.weight(1f)) {}
+    }
+}
+
+@Composable
+fun BatteryStatus() {
+    val context = LocalContext.current
+    var batteryPct by remember { androidx.compose.runtime.mutableFloatStateOf(-1f) }
+    var isCharging by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.DisposableEffect(context) {
+        val intentFilter = android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val batteryStatus: Intent? = context.registerReceiver(null, intentFilter)
+        
+        batteryStatus?.let { intent ->
+            val level: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+            val scale: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
+            batteryPct = level * 100 / scale.toFloat()
+            val status: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
+            isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
+        }
+
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val level: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+                val scale: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
+                batteryPct = level * 100 / scale.toFloat()
+                val status: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
+                isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
+            }
+        }
+        context.registerReceiver(receiver, intentFilter)
+
+        onDispose {
+            context.unregisterReceiver(receiver)
+        }
+    }
+
+    if (batteryPct >= 0) {
+        androidx.compose.foundation.layout.Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(top = 16.dp)
+        ) {
+            if (isCharging) {
+                Text(
+                    text = "⚡",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(end = 4.dp)
+                )
+            }
+            Text(
+                text = "${batteryPct.toInt()}%",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+            )
+        }
     }
 }

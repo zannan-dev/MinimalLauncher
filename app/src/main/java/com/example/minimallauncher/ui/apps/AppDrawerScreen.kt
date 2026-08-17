@@ -40,6 +40,20 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import android.content.ComponentName
+import android.content.Intent
+import android.content.pm.LauncherApps
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.platform.LocalContext
 import com.example.minimallauncher.domain.LaunchableApp
 import com.example.minimallauncher.domain.filterApps
 
@@ -60,6 +74,7 @@ fun AppDrawerScreen(
     val isImeVisible = WindowInsets.isImeVisible
     var wasImeVisible by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    var optionsAppKey by rememberSaveable { mutableStateOf<String?>(null) }
 
     val isAtTop by remember {
         derivedStateOf {
@@ -129,6 +144,10 @@ fun AppDrawerScreen(
                 items(filteredApps, key = { app -> app.key }) { app ->
                     AppDrawerRow(
                         app = app,
+                        showOptions = optionsAppKey == app.key,
+                        onToggleOptions = { show ->
+                            optionsAppKey = if (show) app.key else null
+                        },
                         onLaunchApp = onLaunchApp,
                     )
                 }
@@ -137,17 +156,31 @@ fun AppDrawerScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AppDrawerRow(
     app: LaunchableApp,
+    showOptions: Boolean,
+    onToggleOptions: (Boolean) -> Unit,
     onLaunchApp: (LaunchableApp) -> Unit,
 ) {
+    val context = LocalContext.current
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 64.dp)
-            .clickable { onLaunchApp(app) }
+            .combinedClickable(
+                onClick = {
+                    if (showOptions) {
+                        onToggleOptions(false)
+                    } else {
+                        onLaunchApp(app)
+                    }
+                },
+                onLongClick = { onToggleOptions(true) }
+            )
             .padding(vertical = 8.dp),
     ) {
         Text(
@@ -156,5 +189,42 @@ private fun AppDrawerRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).padding(start = 16.dp, end = 16.dp),
         )
+
+        if (showOptions) {
+            IconButton(onClick = {
+                onToggleOptions(false)
+                try {
+                    val launcherApps = context.getSystemService(android.content.Context.LAUNCHER_APPS_SERVICE) as LauncherApps
+                    val component = ComponentName(app.packageName, app.activityName)
+                    launcherApps.startAppDetailsActivity(component, app.userHandle, null, null)
+                } catch (_: Exception) {
+                    try {
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                        intent.data = Uri.fromParts("package", app.packageName, null)
+                        context.startActivity(intent)
+                    } catch (_: Exception) {}
+                }
+            }) {
+                Icon(imageVector = Icons.Default.Info, contentDescription = "Info")
+            }
+
+            if (!app.isSystemApp) {
+                IconButton(onClick = {
+                    onToggleOptions(false)
+                    try {
+                        val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE)
+                        intent.data = Uri.fromParts("package", app.packageName, null)
+                        intent.putExtra(Intent.EXTRA_USER, app.userHandle)
+                        context.startActivity(intent)
+                    } catch (_: Exception) {}
+                }) {
+                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Uninstall")
+                }
+            }
+
+            IconButton(onClick = { onToggleOptions(false) }) {
+                Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+            }
+        }
     }
 }

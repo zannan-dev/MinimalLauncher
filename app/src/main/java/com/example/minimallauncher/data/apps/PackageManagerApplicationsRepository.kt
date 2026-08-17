@@ -27,13 +27,17 @@ class PackageManagerApplicationsRepository(context: Context) : ApplicationsRepos
                 launcherApps.getActivityList(null, profile).forEach { activityInfo ->
                     val appPackage = activityInfo.applicationInfo.packageName
                     if (appPackage != applicationContext.packageName) {
+                        val flags = activityInfo.applicationInfo.flags
+                        val isSystemApp = (flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0) ||
+                                          (flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0)
                         apps.add(
                             LaunchableApp(
                                 packageName = appPackage,
                                 activityName = activityInfo.componentName.className,
                                 label = activityInfo.label?.toString()?.trim().orEmpty().ifBlank { appPackage },
                                 userHandle = profile,
-                                isPinnedShortcut = false
+                                isPinnedShortcut = false,
+                                isSystemApp = isSystemApp,
                             )
                         )
                     }
