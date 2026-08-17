@@ -19,6 +19,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -164,7 +167,9 @@ fun BatteryStatus() {
             val scale: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
             batteryPct = level * 100 / scale.toFloat()
             val status: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
-            isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
+            val plugged: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, -1)
+            val isPlugged = plugged > 0
+            isCharging = isPlugged || status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
         }
 
         val receiver = object : android.content.BroadcastReceiver() {
@@ -173,7 +178,9 @@ fun BatteryStatus() {
                 val scale: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
                 batteryPct = level * 100 / scale.toFloat()
                 val status: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
-                isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
+                val plugged: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, -1)
+                val isPlugged = plugged > 0
+                isCharging = isPlugged || status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
             }
         }
         context.registerReceiver(receiver, intentFilter)
@@ -190,10 +197,11 @@ fun BatteryStatus() {
             modifier = Modifier.padding(top = 16.dp)
         ) {
             if (isCharging) {
-                Text(
-                    text = "⚡",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(end = 4.dp)
+                Icon(
+                    imageVector = Icons.Default.Bolt,
+                    contentDescription = "Charging",
+                    modifier = Modifier.size(16.dp).padding(end = 2.dp),
+                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
             }
             Text(

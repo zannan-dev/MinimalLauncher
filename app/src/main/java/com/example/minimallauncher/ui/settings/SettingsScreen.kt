@@ -122,7 +122,8 @@ fun SettingsScreen(
                 }
 
                 PreferenceToggle(
-                    title = "Flow Zone (Pomodoro)",
+                    title = "Flow Zone",
+                    subtitle = "Structured work intervals with built-in breaks on your home screen",
                     checked = isFlowZoneEnabled,
                     onCheckedChange = onFlowZoneEnabledChanged,
                 )
