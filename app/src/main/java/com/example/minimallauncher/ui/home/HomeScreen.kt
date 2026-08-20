@@ -72,9 +72,11 @@ fun HomeScreen(
     onResetFlowZone: () -> Unit,
     onOpenDrawer: () -> Unit,
     onOpenSettings: () -> Unit,
+    onSetDefaultLauncher: () -> Unit,
     onLaunchApp: (LaunchableApp) -> Unit,
 ) {
     var now by remember { mutableStateOf(LocalDateTime.now()) }
+    var isDefaultLauncher by remember { mutableStateOf(true) }
     val context = LocalContext.current
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -100,6 +102,11 @@ fun HomeScreen(
                 context.registerReceiver(receiver, intentFilter)
                 isRegistered = true
                 now = LocalDateTime.now() // Update immediately when coming to foreground
+            } else if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                // Check if we are the default launcher
+                val intent = Intent(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_HOME) }
+                val resolveInfo = context.packageManager.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+                isDefaultLauncher = resolveInfo?.activityInfo?.packageName == context.packageName
             } else if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
                 if (isRegistered) {
                     context.unregisterReceiver(receiver)
@@ -183,7 +190,16 @@ fun HomeScreen(
             )
         }
 
-        Box(Modifier.weight(1f)) {}
+        Box(Modifier.weight(1f), contentAlignment = Alignment.BottomCenter) {
+            if (!isDefaultLauncher) {
+                androidx.compose.material3.TextButton(onClick = onSetDefaultLauncher) {
+                    Text(
+                        text = "Set as default launcher",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }
 

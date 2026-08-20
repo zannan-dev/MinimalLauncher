@@ -103,6 +103,7 @@ fun LauncherApp(
                             onResetFlowZone = viewModel::resetFlowZone,
                             onOpenDrawer = { currentScreenName = LauncherScreen.APPS.name },
                             onOpenSettings = { currentScreenName = LauncherScreen.SETTINGS.name },
+                            onSetDefaultLauncher = onOpenDefaultLauncherSettings,
                             onLaunchApp = handleAppLaunch,
                         )
                     LauncherScreen.APPS -> AppDrawerScreen(
