@@ -84,6 +84,16 @@ private class FakePreferencesRepository : LauncherPreferencesRepository {
             showDate = true,
             theme = ThemePreference.SYSTEM,
             favoriteAppKeys = emptySet(),
+            autoOpenKeyboard = true,
+            doubleTapToLock = false,
+            showStatusBar = true,
+            isIntentionalPilotEnabled = false,
+            intentionalPilotDelaySeconds = 10,
+            intentionalPilotAppKeys = emptySet(),
+            isFlowZoneEnabled = false,
+            flowZoneFocusMinutes = 25,
+            flowZoneBreakMinutes = 5,
+            flowZoneLongBreakMinutes = 15,
         ),
     )
     override val preferences: Flow<LauncherPreferences> = state

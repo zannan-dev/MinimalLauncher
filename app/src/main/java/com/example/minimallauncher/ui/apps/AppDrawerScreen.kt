@@ -26,6 +26,12 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -77,6 +83,40 @@ fun AppDrawerScreen(
     val listState = rememberLazyListState()
     var optionsAppKey by rememberSaveable { mutableStateOf<String?>(null) }
 
+    var verticalDrag by remember { mutableStateOf(0f) }
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < 0 && verticalDrag > 0) {
+                    val consumed = available.y.coerceAtLeast(-verticalDrag)
+                    verticalDrag += consumed
+                    return Offset(0f, consumed)
+                } else if (available.y < 0) {
+                    verticalDrag = 0f
+                }
+                return Offset.Zero
+            }
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (available.y > 0) {
+                    verticalDrag += available.y
+                    if (verticalDrag > 72f) {
+                        onBack()
+                        verticalDrag = 0f
+                    }
+                }
+                return Offset.Zero
+            }
+            override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                verticalDrag = 0f
+                return androidx.compose.ui.unit.Velocity.Zero
+            }
+        }
+    }
+
     val isAtTop by remember {
         derivedStateOf {
             listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
@@ -110,7 +150,26 @@ fun AppDrawerScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(nestedScrollConnection)
+            .pointerInput(onBack) {
+                detectVerticalDragGestures(
+                    onVerticalDrag = { _, dragAmount ->
+                        if (isAtTop) {
+                            verticalDrag = (verticalDrag + dragAmount).coerceAtLeast(0f)
+                            if (verticalDrag > 72f) {
+                                onBack()
+                                verticalDrag = 0f
+                            }
+                        }
+                    },
+                    onDragEnd = { verticalDrag = 0f }
+                )
+            }
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
         TextField(
             value = query,
             onValueChange = { query = it },
