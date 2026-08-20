@@ -1,6 +1,7 @@
 package com.example.minimallauncher.domain
 
 import java.text.Collator
+import java.text.Normalizer
 
 /** Returns a stable, case-insensitive, locale-aware alphabetical ordering for the app drawer. */
 fun sortApps(apps: Iterable<LaunchableApp>): List<LaunchableApp> {
@@ -12,12 +13,26 @@ fun sortApps(apps: Iterable<LaunchableApp>): List<LaunchableApp> {
     )
 }
 
-/** Filters a pre-sorted app list without changing its order. */
+private val diacriticsRegex = Regex("\\p{InCombiningDiacriticalMarks}+")
+private val separatorsRegex = Regex("[-_+,.`'\\s\\p{Z}]")
+
+private fun CharSequence.normalizeForSearch(): String =
+    Normalizer.normalize(this, Normalizer.Form.NFD)
+        .replace(diacriticsRegex, "")
+        .replace(separatorsRegex, "")
+
+/** Filters a pre-sorted app list without changing its order, ignoring spaces, punctuation, and diacritics. */
 fun filterApps(apps: Iterable<LaunchableApp>, query: String): List<LaunchableApp> {
     val normalizedQuery = query.trim()
-    return if (normalizedQuery.isEmpty()) {
-        apps.toList()
-    } else {
-        apps.filter { app -> app.label.contains(normalizedQuery, ignoreCase = true) }
+    if (normalizedQuery.isEmpty()) return apps.toList()
+    
+    val searchNormalized = query.normalizeForSearch()
+    
+    return apps.filter { app -> 
+        if (app.label.contains(normalizedQuery, ignoreCase = true)) {
+            true
+        } else {
+            searchNormalized.isNotEmpty() && app.label.normalizeForSearch().contains(searchNormalized, ignoreCase = true)
+        }
     }
 }
