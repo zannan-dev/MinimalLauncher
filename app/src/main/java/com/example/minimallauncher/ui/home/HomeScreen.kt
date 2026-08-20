@@ -75,14 +75,49 @@ fun HomeScreen(
     onLaunchApp: (LaunchableApp) -> Unit,
 ) {
     var now by remember { mutableStateOf(LocalDateTime.now()) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        while (isActive) {
-            now = LocalDateTime.now()
-            delay(1_000)
+    val context = LocalContext.current
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+
+    androidx.compose.runtime.DisposableEffect(context, lifecycleOwner) {
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == Intent.ACTION_TIME_TICK ||
+                    intent.action == Intent.ACTION_TIME_CHANGED ||
+                    intent.action == Intent.ACTION_TIMEZONE_CHANGED) {
+                    now = LocalDateTime.now()
+                }
+            }
+        }
+        val intentFilter = android.content.IntentFilter(Intent.ACTION_TIME_TICK).apply {
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+        }
+        
+        var isRegistered = false
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START) {
+                context.registerReceiver(receiver, intentFilter)
+                isRegistered = true
+                now = LocalDateTime.now() // Update immediately when coming to foreground
+            } else if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                if (isRegistered) {
+                    context.unregisterReceiver(receiver)
+                    isRegistered = false
+                }
+            }
+        }
+        
+        lifecycleOwner.lifecycle.addObserver(observer)
+        
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            if (isRegistered) {
+                context.unregisterReceiver(receiver)
+            }
         }
     }
     var verticalDrag by remember { mutableStateOf(0f) }
-    val context = LocalContext.current
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -158,20 +193,11 @@ fun BatteryStatus() {
     var batteryPct by remember { androidx.compose.runtime.mutableFloatStateOf(-1f) }
     var isCharging by remember { mutableStateOf(false) }
 
-    androidx.compose.runtime.DisposableEffect(context) {
-        val intentFilter = android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        val batteryStatus: Intent? = context.registerReceiver(null, intentFilter)
-        
-        batteryStatus?.let { intent ->
-            val level: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
-            val scale: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
-            batteryPct = level * 100 / scale.toFloat()
-            val status: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
-            val plugged: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, -1)
-            val isPlugged = plugged > 0
-            isCharging = isPlugged || status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
-        }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
+    androidx.compose.runtime.DisposableEffect(context, lifecycleOwner) {
+        val intentFilter = android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        
         val receiver = object : android.content.BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val level: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
@@ -183,10 +209,37 @@ fun BatteryStatus() {
                 isCharging = isPlugged || status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
             }
         }
-        context.registerReceiver(receiver, intentFilter)
+
+        var isRegistered = false
+
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START) {
+                val batteryStatus: Intent? = context.registerReceiver(receiver, intentFilter)
+                isRegistered = true
+                batteryStatus?.let { intent ->
+                    val level: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+                    val scale: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
+                    batteryPct = level * 100 / scale.toFloat()
+                    val status: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
+                    val plugged: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, -1)
+                    val isPlugged = plugged > 0
+                    isCharging = isPlugged || status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
+                }
+            } else if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                if (isRegistered) {
+                    context.unregisterReceiver(receiver)
+                    isRegistered = false
+                }
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
 
         onDispose {
-            context.unregisterReceiver(receiver)
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            if (isRegistered) {
+                context.unregisterReceiver(receiver)
+            }
         }
     }
 

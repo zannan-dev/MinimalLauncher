@@ -39,6 +39,9 @@ import com.example.minimallauncher.domain.LaunchableApp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+
 @Composable
 fun IntentionalPilotScreen(
     app: LaunchableApp,
@@ -51,6 +54,7 @@ fun IntentionalPilotScreen(
     var phaseSecondsLeft by remember { mutableStateOf(3) }
 
     val breathingProgress = remember { Animatable(0f) }
+    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(delaySeconds) {
         remainingSeconds = delaySeconds
@@ -61,37 +65,36 @@ fun IntentionalPilotScreen(
     }
     
     LaunchedEffect(Unit) {
-        launch {
-            breathPhase = "Get ready"
-            for (i in 3 downTo 1) {
-                phaseSecondsLeft = i
-                delay(1000L)
-            }
-            while (true) {
-                breathPhase = "Inhale"
-                for (i in 4 downTo 1) {
-                    phaseSecondsLeft = i
-                    delay(1000L)
-                }
-                breathPhase = "Exhale"
-                for (i in 7 downTo 1) {
-                    phaseSecondsLeft = i
-                    delay(1000L)
-                }
-            }
+        breathPhase = "Get ready"
+        for (i in 3 downTo 1) {
+            phaseSecondsLeft = i
+            delay(1000L)
         }
-        
-        launch {
-            delay(3000L)
-            while (true) {
+        while (true) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            breathPhase = "Inhale"
+            launch {
                 breathingProgress.animateTo(
                     targetValue = 1f,
                     animationSpec = tween(durationMillis = 4000, easing = FastOutSlowInEasing)
                 )
+            }
+            for (i in 4 downTo 1) {
+                phaseSecondsLeft = i
+                delay(1000L)
+            }
+            
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            breathPhase = "Exhale"
+            launch {
                 breathingProgress.animateTo(
                     targetValue = 0f,
                     animationSpec = tween(durationMillis = 7000, easing = FastOutSlowInEasing)
                 )
+            }
+            for (i in 7 downTo 1) {
+                phaseSecondsLeft = i
+                delay(1000L)
             }
         }
     }
