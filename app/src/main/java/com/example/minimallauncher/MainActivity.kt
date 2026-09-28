@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
             LauncherApp(
                 viewModel = viewModel,
                 onOpenDefaultLauncherSettings = ::openDefaultLauncherSettings,
+                onOpenNotifications = ::openNotifications,
             )
         }
     }
@@ -33,7 +34,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         appsChangeObserver.start()
-        viewModel.refreshApps()
+        viewModel.refreshAppsOnForeground()
     }
 
     override fun onStop() {
@@ -45,6 +46,15 @@ class MainActivity : ComponentActivity() {
         val intent = Intent(Settings.ACTION_HOME_SETTINGS)
         runCatching { startActivity(intent) }
             .getOrElse { startActivity(Intent(Settings.ACTION_SETTINGS)) }
+    }
+
+    private fun openNotifications() {
+        val expanded = runCatching {
+            val statusBar = getSystemService("statusbar") ?: return@runCatching false
+            statusBar.javaClass.getMethod("expandNotificationsPanel").invoke(statusBar)
+            true
+        }.getOrDefault(false)
+        if (!expanded) LauncherAccessibilityService.showNotifications()
     }
 
     override fun onNewIntent(intent: Intent) {

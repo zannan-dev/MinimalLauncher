@@ -7,10 +7,11 @@ import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.animation.togetherWith
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.runtime.mutableStateOf
@@ -34,8 +35,10 @@ private enum class LauncherScreen { HOME, APPS, SETTINGS, INTENTIONAL_PILOT_APPS
 fun LauncherApp(
     viewModel: LauncherViewModel,
     onOpenDefaultLauncherSettings: () -> Unit,
+    onOpenNotifications: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val appDrawerListState = rememberLazyListState()
     var currentScreenName by rememberSaveable { mutableStateOf(LauncherScreen.HOME.name) }
     val currentScreen = LauncherScreen.valueOf(currentScreenName)
     val openHome = { currentScreenName = LauncherScreen.HOME.name }
@@ -58,8 +61,8 @@ fun LauncherApp(
     BackHandler(enabled = currentScreen != LauncherScreen.HOME, onBack = openHome)
 
     val view = LocalView.current
-    SideEffect {
-        val window = (view.context as? Activity)?.window ?: return@SideEffect
+    LaunchedEffect(view, state.preferences.showStatusBar) {
+        val window = (view.context as? Activity)?.window ?: return@LaunchedEffect
         val controller = WindowInsetsControllerCompat(window, view)
         if (state.preferences.showStatusBar) {
             controller.show(WindowInsetsCompat.Type.statusBars())
@@ -81,7 +84,6 @@ fun LauncherApp(
                 if (pendingApp != null) {
                     IntentionalPilotScreen(
                         app = pendingApp,
-                        delaySeconds = state.preferences.intentionalPilotDelaySeconds,
                         onLaunchApp = {
                             viewModel.launchApp(pendingApp)
                             appPendingLaunch = null
@@ -96,14 +98,14 @@ fun LauncherApp(
                         targetState = currentScreen,
                         transitionSpec = {
                             if (targetState == LauncherScreen.APPS && initialState == LauncherScreen.HOME) {
-                                // Home exits (slides up), Apps enters (fades in)
+                                androidx.compose.animation.slideInHorizontally(animationSpec = androidx.compose.animation.core.tween(250), initialOffsetX = { it }) +
                                 androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(250)) togetherWith
-                                androidx.compose.animation.slideOutVertically(animationSpec = androidx.compose.animation.core.tween(250), targetOffsetY = { -it / 3 }) + 
+                                androidx.compose.animation.slideOutHorizontally(animationSpec = androidx.compose.animation.core.tween(250), targetOffsetX = { -it / 3 }) +
                                 androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(250))
                             } else if (targetState == LauncherScreen.HOME && initialState == LauncherScreen.APPS) {
-                                // Home enters (slides down from top), Apps exits (fades out)
-                                androidx.compose.animation.slideInVertically(animationSpec = androidx.compose.animation.core.tween(250), initialOffsetY = { -it / 3 }) + 
+                                androidx.compose.animation.slideInHorizontally(animationSpec = androidx.compose.animation.core.tween(250), initialOffsetX = { -it / 3 }) +
                                 androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(250)) togetherWith
+                                androidx.compose.animation.slideOutHorizontally(animationSpec = androidx.compose.animation.core.tween(250), targetOffsetX = { it }) +
                                 androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(250))
                             } else {
                                 androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(250)) togetherWith 
@@ -114,52 +116,41 @@ fun LauncherApp(
                     ) { screen ->
                         when (screen) {
                             LauncherScreen.HOME -> HomeScreen(
-                                use24HourClock = state.preferences.use24HourClock,
+                                favoriteApps = state.favoriteApps,
                                 showDate = state.preferences.showDate,
                                 doubleTapToLock = state.preferences.doubleTapToLock,
-                                isFlowZoneEnabled = state.preferences.isFlowZoneEnabled,
-                                flowZoneState = state.flowZoneState,
-                                onToggleFlowZoneTimer = viewModel::toggleFlowZoneTimer,
-                                onSkipFlowZonePhase = viewModel::skipFlowZonePhase,
-                                onResetFlowZone = viewModel::resetFlowZone,
                                 onOpenDrawer = { currentScreenName = LauncherScreen.APPS.name },
+                                onOpenNotifications = onOpenNotifications,
                                 onOpenSettings = { currentScreenName = LauncherScreen.SETTINGS.name },
                                 onSetDefaultLauncher = onOpenDefaultLauncherSettings,
                                 onLaunchApp = handleAppLaunch,
+                                onMoveFavorite = viewModel::moveFavorite,
+                                onRemoveFavorite = viewModel::removeFavorite,
                             )
                             LauncherScreen.APPS -> AppDrawerScreen(
                                 apps = state.apps,
+                                listState = appDrawerListState,
                                 autoOpenKeyboard = state.preferences.autoOpenKeyboard,
                                 isLoading = state.isLoadingApps,
                                 failedToLoad = state.appLoadError,
+                                favoriteKeys = state.preferences.favoriteAppKeys,
                                 onBack = openHome,
                                 onLaunchApp = handleAppLaunch,
+                                onToggleFavorite = viewModel::toggleFavorite,
                             )
                             LauncherScreen.SETTINGS -> SettingsScreen(
-                                use24HourClock = state.preferences.use24HourClock,
                                 showDate = state.preferences.showDate,
                                 autoOpenKeyboard = state.preferences.autoOpenKeyboard,
                                 doubleTapToLock = state.preferences.doubleTapToLock,
                                 showStatusBar = state.preferences.showStatusBar,
                                 isIntentionalPilotEnabled = state.preferences.isIntentionalPilotEnabled,
-                                intentionalPilotDelaySeconds = state.preferences.intentionalPilotDelaySeconds,
-                                isFlowZoneEnabled = state.preferences.isFlowZoneEnabled,
-                                flowZoneFocusMinutes = state.preferences.flowZoneFocusMinutes,
-                                flowZoneBreakMinutes = state.preferences.flowZoneBreakMinutes,
-                                flowZoneLongBreakMinutes = state.preferences.flowZoneLongBreakMinutes,
                                 theme = state.preferences.theme,
-                                onUse24HourClockChanged = viewModel::setUse24HourClock,
                                 onShowDateChanged = viewModel::setShowDate,
                                 onAutoOpenKeyboardChanged = viewModel::setAutoOpenKeyboard,
                                 onDoubleTapToLockChanged = viewModel::setDoubleTapToLock,
                                 onShowStatusBarChanged = viewModel::setShowStatusBar,
                                 onIntentionalPilotEnabledChanged = viewModel::setIntentionalPilotEnabled,
-                                onIntentionalPilotDelayChanged = viewModel::setIntentionalPilotDelaySeconds,
                                 onSelectIntentionalPilotApps = { currentScreenName = LauncherScreen.INTENTIONAL_PILOT_APPS.name },
-                                onFlowZoneEnabledChanged = viewModel::setFlowZoneEnabled,
-                                onFlowZoneFocusMinutesChanged = viewModel::setFlowZoneFocusMinutes,
-                                onFlowZoneBreakMinutesChanged = viewModel::setFlowZoneBreakMinutes,
-                                onFlowZoneLongBreakMinutesChanged = viewModel::setFlowZoneLongBreakMinutes,
                                 onThemeChanged = viewModel::setTheme,
                                 onOpenDefaultLauncherSettings = onOpenDefaultLauncherSettings,
                             )

@@ -1,30 +1,20 @@
 package com.example.minimallauncher.ui.home
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import android.text.format.DateFormat
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,52 +22,60 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.minimallauncher.LauncherAccessibilityService
 import com.example.minimallauncher.domain.LaunchableApp
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-
-@SuppressLint("WrongConstant")
-private fun expandNotifications(context: Context): Boolean {
-    return try {
-        val statusBarService = context.getSystemService("statusbar")
-        val statusBarManager = Class.forName("android.app.StatusBarManager")
-        val method = statusBarManager.getMethod("expandNotificationsPanel")
-        method.invoke(statusBarService)
-        true
-    } catch (_: Exception) {
-        false
-    }
-}
+import kotlin.math.abs
 
 @Composable
 fun HomeScreen(
-    use24HourClock: Boolean,
+    favoriteApps: List<LaunchableApp>,
     showDate: Boolean,
     doubleTapToLock: Boolean,
-    isFlowZoneEnabled: Boolean,
-    flowZoneState: com.example.minimallauncher.ui.FlowZoneState,
-    onToggleFlowZoneTimer: () -> Unit,
-    onSkipFlowZonePhase: () -> Unit,
-    onResetFlowZone: () -> Unit,
     onOpenDrawer: () -> Unit,
+    onOpenNotifications: () -> Unit,
     onOpenSettings: () -> Unit,
     onSetDefaultLauncher: () -> Unit,
     onLaunchApp: (LaunchableApp) -> Unit,
+    onMoveFavorite: (LaunchableApp, LaunchableApp) -> Unit,
+    onRemoveFavorite: (LaunchableApp) -> Unit,
 ) {
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     var isDefaultLauncher by remember { mutableStateOf(true) }
     val context = LocalContext.current
+    var use24HourClock by remember(context) { mutableStateOf(DateFormat.is24HourFormat(context)) }
+    val locale = Locale.getDefault()
+    val timeFormatter = remember(use24HourClock, locale) {
+        DateTimeFormatter.ofPattern(if (use24HourClock) "HH:mm" else "h:mm a", locale)
+    }
+    val dateFormatter = remember(locale) { DateTimeFormatter.ofPattern("EEEE, d MMMM", locale) }
+    val dateText = remember(now.toLocalDate(), locale) {
+        if (locale.language == "en") {
+            val day = now.dayOfMonth
+            val suffix = if (day in 11..13) "th" else when (day % 10) {
+                1 -> "st"
+                2 -> "nd"
+                3 -> "rd"
+                else -> "th"
+            }
+            now.format(DateTimeFormatter.ofPattern("EEEE, ", locale)) +
+                "$day$suffix " + now.format(DateTimeFormatter.ofPattern("MMMM", locale))
+        } else {
+            now.format(dateFormatter)
+        }
+    }
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
@@ -88,6 +86,7 @@ fun HomeScreen(
                     intent.action == Intent.ACTION_TIME_CHANGED ||
                     intent.action == Intent.ACTION_TIMEZONE_CHANGED) {
                     now = LocalDateTime.now()
+                    use24HourClock = DateFormat.is24HourFormat(context)
                 }
             }
         }
@@ -102,7 +101,9 @@ fun HomeScreen(
                 context.registerReceiver(receiver, intentFilter)
                 isRegistered = true
                 now = LocalDateTime.now() // Update immediately when coming to foreground
+                use24HourClock = DateFormat.is24HourFormat(context)
             } else if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                use24HourClock = DateFormat.is24HourFormat(context)
                 // Check if we are the default launcher
                 val intent = Intent(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_HOME) }
                 val resolveInfo = context.packageManager.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
@@ -124,25 +125,38 @@ fun HomeScreen(
             }
         }
     }
-    var verticalDrag by remember { mutableStateOf(0f) }
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(onOpenDrawer) {
-                detectVerticalDragGestures(
-                    onVerticalDrag = { _, dragAmount ->
-                        verticalDrag += dragAmount
-                        if (verticalDrag < -72f) {
-                            onOpenDrawer()
-                            verticalDrag = 0f
-                        } else if (verticalDrag > 72f) {
-                            expandNotifications(context)
-                            verticalDrag = 0f
+            .background(Color.Black)
+            .pointerInput(onOpenDrawer, onOpenNotifications) {
+                var drag = Offset.Zero
+                var handled = false
+                val threshold = 72.dp.toPx()
+                detectDragGestures(
+                    onDrag = { _, amount ->
+                        if (!handled) {
+                            drag += amount
+                            when {
+                                drag.x < -threshold && abs(drag.x) > abs(drag.y) -> {
+                                    handled = true
+                                    onOpenDrawer()
+                                }
+                                drag.y > threshold && abs(drag.y) > abs(drag.x) -> {
+                                    handled = true
+                                    onOpenNotifications()
+                                }
+                            }
                         }
                     },
-                    onDragEnd = { verticalDrag = 0f },
+                    onDragEnd = {
+                        drag = Offset.Zero
+                        handled = false
+                    },
+                    onDragCancel = {
+                        drag = Offset.Zero
+                        handled = false
+                    },
                 )
             }
             .pointerInput(onOpenSettings) {
@@ -157,49 +171,47 @@ fun HomeScreen(
                     }
                 )
             }
-            .padding(horizontal = 24.dp, vertical = 32.dp),
+            .padding(horizontal = 24.dp),
     ) {
-        Text(
-            text = now.format(
-                DateTimeFormatter.ofPattern(if (use24HourClock) "HH:mm" else "h:mm", Locale.getDefault()),
-            ),
-            style = MaterialTheme.typography.displayLarge,
-            modifier = Modifier.semantics { contentDescription = "Current time" },
-        )
-        if (showDate) {
-            Spacer(Modifier.height(12.dp))
+        Column(
+            modifier = Modifier.align(Alignment.TopStart).padding(top = 8.dp),
+            horizontalAlignment = Alignment.Start,
+        ) {
             Text(
-                text = now.format(DateTimeFormatter.ofPattern("EEEE\nd MMMM", Locale.getDefault())),
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center,
+                text = now.format(timeFormatter),
+                fontSize = 25.sp,
+                lineHeight = 32.sp,
+                color = Color.White,
+                modifier = Modifier.semantics { contentDescription = "Current time" },
             )
-        }
-        
-        BatteryStatus()
-        
-        Spacer(Modifier.height(32.dp))
-
-        Spacer(Modifier.height(32.dp))
-
-        if (isFlowZoneEnabled) {
-            FlowZoneTimer(
-                state = flowZoneState,
-                onToggleTimer = onToggleFlowZoneTimer,
-                onSkipPhase = onSkipFlowZonePhase,
-                onReset = onResetFlowZone
-            )
-        }
-
-        Box(Modifier.weight(1f), contentAlignment = Alignment.BottomCenter) {
+            if (showDate) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = dateText,
+                    fontSize = 13.sp,
+                    color = Color.White,
+                )
+            }
+            BatteryStatus()
             if (!isDefaultLauncher) {
-                androidx.compose.material3.TextButton(onClick = onSetDefaultLauncher) {
-                    Text(
-                        text = "Set as default launcher",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Set as default launcher",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = Color.White,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier.clickable(onClick = onSetDefaultLauncher),
+                )
             }
         }
+        HomeFavorites(
+            apps = favoriteApps,
+            onLaunchApp = onLaunchApp,
+            onMoveFavorite = onMoveFavorite,
+            onRemoveFavorite = onRemoveFavorite,
+            modifier = Modifier.fillMaxSize().padding(top = maxHeight * 0.44f),
+        )
     }
 }
 
@@ -218,7 +230,7 @@ fun BatteryStatus() {
             override fun onReceive(context: Context, intent: Intent) {
                 val level: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
                 val scale: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
-                batteryPct = level * 100 / scale.toFloat()
+                if (level >= 0 && scale > 0) batteryPct = level * 100 / scale.toFloat()
                 val status: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
                 val plugged: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, -1)
                 val isPlugged = plugged > 0
@@ -235,7 +247,7 @@ fun BatteryStatus() {
                 batteryStatus?.let { intent ->
                     val level: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
                     val scale: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
-                    batteryPct = level * 100 / scale.toFloat()
+                    if (level >= 0 && scale > 0) batteryPct = level * 100 / scale.toFloat()
                     val status: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
                     val plugged: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, -1)
                     val isPlugged = plugged > 0
@@ -260,24 +272,11 @@ fun BatteryStatus() {
     }
 
     if (batteryPct >= 0) {
-        androidx.compose.foundation.layout.Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(top = 16.dp)
-        ) {
-            if (isCharging) {
-                Icon(
-                    imageVector = Icons.Default.Bolt,
-                    contentDescription = "Charging",
-                    modifier = Modifier.size(16.dp).padding(end = 2.dp),
-                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                )
-            }
-            Text(
-                text = "${batteryPct.toInt()}%",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-            )
-        }
+        Text(
+            text = (if (isCharging) "+" else "") + "${batteryPct.toInt()}%",
+            fontSize = 14.sp,
+            color = Color.White,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }

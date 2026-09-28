@@ -33,5 +33,9 @@ class LauncherAccessibilityService : AccessibilityService() {
         fun lockScreen(): Boolean {
             return instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) == true
         }
+
+        fun showNotifications(): Boolean {
+            return instance?.performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS) == true
+        }
     }
 }

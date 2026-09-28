@@ -15,4 +15,5 @@ data class LaunchableApp(
     val isSystemApp: Boolean = false,
 ) {
     val key = "${packageName}_${activityName}_${userHandle.hashCode()}_${isPinnedShortcut}"
+    internal val searchableLabel = label.normalizeForSearch()
 }

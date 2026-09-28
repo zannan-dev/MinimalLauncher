@@ -15,8 +15,8 @@ import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,11 +26,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -58,6 +54,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.platform.LocalContext
@@ -68,54 +66,22 @@ import com.example.minimallauncher.domain.filterApps
 @Composable
 fun AppDrawerScreen(
     apps: List<LaunchableApp>,
+    listState: LazyListState,
     autoOpenKeyboard: Boolean,
     isLoading: Boolean,
     failedToLoad: Boolean,
+    favoriteKeys: Set<String>,
     onBack: () -> Unit,
     onLaunchApp: (LaunchableApp) -> Unit,
+    onToggleFavorite: (LaunchableApp) -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    val filteredApps by remember(apps, query) { mutableStateOf(filterApps(apps, query)) }
+    val filteredApps = remember(apps, query) { filterApps(apps, query) }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val isImeVisible = WindowInsets.isImeVisible
     var wasImeVisible by remember { mutableStateOf(false) }
-    val listState = rememberLazyListState()
     var optionsAppKey by rememberSaveable { mutableStateOf<String?>(null) }
-
-    var verticalDrag by remember { mutableStateOf(0f) }
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (available.y < 0 && verticalDrag > 0) {
-                    val consumed = available.y.coerceAtLeast(-verticalDrag)
-                    verticalDrag += consumed
-                    return Offset(0f, consumed)
-                } else if (available.y < 0) {
-                    verticalDrag = 0f
-                }
-                return Offset.Zero
-            }
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource
-            ): Offset {
-                if (available.y > 0) {
-                    verticalDrag += available.y
-                    if (verticalDrag > 72f) {
-                        onBack()
-                        verticalDrag = 0f
-                    }
-                }
-                return Offset.Zero
-            }
-            override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
-                verticalDrag = 0f
-                return androidx.compose.ui.unit.Velocity.Zero
-            }
-        }
-    }
 
     val isAtTop by remember {
         derivedStateOf {
@@ -153,19 +119,18 @@ fun AppDrawerScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .nestedScroll(nestedScrollConnection)
             .pointerInput(onBack) {
-                detectVerticalDragGestures(
-                    onVerticalDrag = { _, dragAmount ->
-                        if (isAtTop) {
-                            verticalDrag = (verticalDrag + dragAmount).coerceAtLeast(0f)
-                            if (verticalDrag > 72f) {
-                                onBack()
-                                verticalDrag = 0f
-                            }
+                var horizontalDrag = 0f
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { _, dragAmount ->
+                        horizontalDrag += dragAmount
+                        if (horizontalDrag > 72f) {
+                            onBack()
+                            horizontalDrag = 0f
                         }
                     },
-                    onDragEnd = { verticalDrag = 0f }
+                    onDragEnd = { horizontalDrag = 0f },
+                    onDragCancel = { horizontalDrag = 0f },
                 )
             }
             .padding(horizontal = 16.dp, vertical = 12.dp)
@@ -212,11 +177,13 @@ fun AppDrawerScreen(
                 items(filteredApps, key = { app -> app.key }) { app ->
                     AppDrawerRow(
                         app = app,
+                        isFavorite = app.key in favoriteKeys,
                         showOptions = optionsAppKey == app.key,
                         onToggleOptions = { show ->
                             optionsAppKey = if (show) app.key else null
                         },
                         onLaunchApp = onLaunchApp,
+                        onToggleFavorite = onToggleFavorite,
                     )
                 }
             }
@@ -228,9 +195,11 @@ fun AppDrawerScreen(
 @Composable
 private fun AppDrawerRow(
     app: LaunchableApp,
+    isFavorite: Boolean,
     showOptions: Boolean,
     onToggleOptions: (Boolean) -> Unit,
     onLaunchApp: (LaunchableApp) -> Unit,
+    onToggleFavorite: (LaunchableApp) -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -259,6 +228,15 @@ private fun AppDrawerRow(
         )
 
         if (showOptions) {
+            IconButton(onClick = {
+                onToggleFavorite(app)
+                onToggleOptions(false)
+            }) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                    contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                )
+            }
             IconButton(onClick = {
                 onToggleOptions(false)
                 try {

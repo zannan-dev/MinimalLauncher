@@ -14,15 +14,10 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -36,35 +31,21 @@ import com.example.minimallauncher.domain.LaunchableApp
 
 @Composable
 fun SettingsScreen(
-    use24HourClock: Boolean,
     showDate: Boolean,
     autoOpenKeyboard: Boolean,
     doubleTapToLock: Boolean,
     showStatusBar: Boolean,
     isIntentionalPilotEnabled: Boolean,
-    intentionalPilotDelaySeconds: Int,
-    isFlowZoneEnabled: Boolean,
-    flowZoneFocusMinutes: Int,
-    flowZoneBreakMinutes: Int,
-    flowZoneLongBreakMinutes: Int,
     theme: ThemePreference,
-    onUse24HourClockChanged: (Boolean) -> Unit,
     onShowDateChanged: (Boolean) -> Unit,
     onAutoOpenKeyboardChanged: (Boolean) -> Unit,
     onDoubleTapToLockChanged: (Boolean) -> Unit,
     onShowStatusBarChanged: (Boolean) -> Unit,
     onIntentionalPilotEnabledChanged: (Boolean) -> Unit,
-    onIntentionalPilotDelayChanged: (Int) -> Unit,
     onSelectIntentionalPilotApps: () -> Unit,
-    onFlowZoneEnabledChanged: (Boolean) -> Unit,
-    onFlowZoneFocusMinutesChanged: (Int) -> Unit,
-    onFlowZoneBreakMinutesChanged: (Int) -> Unit,
-    onFlowZoneLongBreakMinutesChanged: (Int) -> Unit,
     onThemeChanged: (ThemePreference) -> Unit,
     onOpenDefaultLauncherSettings: () -> Unit,
 ) {
-    var showAdvancedBreaks by remember { mutableStateOf(false) }
-
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
             text = "Settings",
@@ -74,11 +55,6 @@ fun SettingsScreen(
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
             item {
                 SettingsSectionTitle("General")
-                PreferenceToggle(
-                    title = "24-hour clock",
-                    checked = use24HourClock,
-                    onCheckedChange = onUse24HourClockChanged,
-                )
                 PreferenceToggle(
                     title = "Show date",
                     checked = showDate,
@@ -102,62 +78,16 @@ fun SettingsScreen(
 
                 PreferenceToggle(
                     title = "Intentional Pilot",
-                    subtitle = "Add a mindful breathing delay before opening distracting apps",
+                    subtitle = "Pause for 3 seconds to consider why you are opening distracting apps",
                     checked = isIntentionalPilotEnabled,
                     onCheckedChange = onIntentionalPilotEnabledChanged,
                 )
                 if (isIntentionalPilotEnabled) {
                     PreferenceRow(
                         title = "Select apps to delay",
-                        subtitle = "Choose which apps require you to pause and breathe.",
+                        subtitle = "Choose which apps ask you to pause before opening.",
                         onClick = onSelectIntentionalPilotApps
                     )
-                    DurationSettingRow(
-                        title = "Breathing Delay",
-                        currentValue = intentionalPilotDelaySeconds,
-                        valueRange = 3f..30f,
-                        unit = "sec",
-                        onValueChanged = onIntentionalPilotDelayChanged
-                    )
-                }
-
-                PreferenceToggle(
-                    title = "Flow Zone",
-                    subtitle = "Structured work intervals with built-in breaks on your home screen",
-                    checked = isFlowZoneEnabled,
-                    onCheckedChange = onFlowZoneEnabledChanged,
-                )
-                if (isFlowZoneEnabled) {
-                    DurationSettingRow(
-                        title = "Flow Duration",
-                        currentValue = flowZoneFocusMinutes,
-                        valueRange = 1f..90f,
-                        unit = "min",
-                        onValueChanged = onFlowZoneFocusMinutesChanged
-                    )
-                    
-                    PreferenceRow(
-                        title = if (showAdvancedBreaks) "Hide break settings" else "Customize breaks",
-                        subtitle = if (!showAdvancedBreaks) "$flowZoneBreakMinutes min short, $flowZoneLongBreakMinutes min long" else null,
-                        onClick = { showAdvancedBreaks = !showAdvancedBreaks }
-                    )
-                    
-                    if (showAdvancedBreaks) {
-                        DurationSettingRow(
-                            title = "Short Break",
-                            currentValue = flowZoneBreakMinutes,
-                            valueRange = 1f..30f,
-                            unit = "min",
-                            onValueChanged = onFlowZoneBreakMinutesChanged
-                        )
-                        DurationSettingRow(
-                            title = "Long Break",
-                            currentValue = flowZoneLongBreakMinutes,
-                            valueRange = 1f..60f,
-                            unit = "min",
-                            onValueChanged = onFlowZoneLongBreakMinutesChanged
-                        )
-                    }
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -262,35 +192,5 @@ private fun PreferenceRow(
                 modifier = Modifier.padding(top = 4.dp)
             )
         }
-    }
-}
-
-@Composable
-private fun DurationSettingRow(
-    title: String,
-    currentValue: Int,
-    valueRange: ClosedFloatingPointRange<Float>,
-    unit: String = "min",
-    onValueChanged: (Int) -> Unit,
-) {
-    Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                text = "$currentValue $unit",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-        Slider(
-            value = currentValue.toFloat(),
-            onValueChange = { onValueChanged(it.toInt()) },
-            valueRange = valueRange,
-            modifier = Modifier.padding(top = 4.dp)
-        )
     }
 }

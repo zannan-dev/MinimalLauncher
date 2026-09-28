@@ -55,7 +55,7 @@ fun IntentionalPilotAppSelectionScreen(
                 .padding(paddingValues)
         ) {
             Text(
-                text = "Selected apps will require a breathing exercise before launching.",
+                text = "Selected apps will ask you to pause and consider why you want to open them.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)

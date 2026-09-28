@@ -7,7 +7,7 @@ The launcher is entirely offline. It has no analytics, advertisements, news feed
 ## Features
 
 - Can be selected as the device's default HOME launcher.
-- Large clock with 12/24-hour and date-visibility settings.
+- Large clock that follows the system’s 12/24-hour format, with an optional date.
 - Persisted favorite applications backed by DataStore.
 - App drawer with icons, case-insensitive live search, and alphabetical ordering.
 - Automatic drawer refresh while the launcher is visible when packages are installed, removed, or updated.

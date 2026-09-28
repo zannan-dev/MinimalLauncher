@@ -7,7 +7,6 @@ import com.example.minimallauncher.data.preferences.ThemePreference
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -17,14 +16,39 @@ class DataStorePreferencesTest {
     fun settingsPersistWhenRepositoryIsRecreated() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val firstRepository = DataStoreLauncherPreferencesRepository(context)
-        firstRepository.setUse24HourClock(true)
-        firstRepository.setShowDate(false)
-        firstRepository.setTheme(ThemePreference.DARK)
+        val original = firstRepository.preferences.first()
+        try {
+            firstRepository.setShowDate(false)
+            firstRepository.setTheme(ThemePreference.DARK)
 
-        val restored = DataStoreLauncherPreferencesRepository(context).preferences.first()
+            val restored = DataStoreLauncherPreferencesRepository(context).preferences.first()
 
-        assertTrue(restored.use24HourClock)
-        assertEquals(false, restored.showDate)
-        assertEquals(ThemePreference.DARK, restored.theme)
+            assertEquals(false, restored.showDate)
+            assertEquals(ThemePreference.DARK, restored.theme)
+        } finally {
+            firstRepository.setShowDate(original.showDate)
+            firstRepository.setTheme(original.theme)
+        }
+    }
+
+    @Test
+    fun favoriteOrderPersistsAcrossRepositoryInstances() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = DataStoreLauncherPreferencesRepository(context)
+        val first = "test_favorite_first"
+        val second = "test_favorite_second"
+        repository.removeFavorite(first)
+        repository.removeFavorite(second)
+        try {
+            repository.toggleFavorite(first)
+            repository.toggleFavorite(second)
+            repository.moveFavorite(second, first)
+
+            val restored = DataStoreLauncherPreferencesRepository(context).preferences.first()
+            assertEquals(listOf(second, first), restored.favoriteAppOrder.filter { it == first || it == second })
+        } finally {
+            repository.removeFavorite(first)
+            repository.removeFavorite(second)
+        }
     }
 }
