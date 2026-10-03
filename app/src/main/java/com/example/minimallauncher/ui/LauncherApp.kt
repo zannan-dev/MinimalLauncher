@@ -2,13 +2,22 @@ package com.example.minimallauncher.ui
 
 import androidx.activity.compose.BackHandler
 import android.app.Activity
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.runtime.Composable
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.LaunchedEffect
@@ -29,7 +38,7 @@ import com.example.minimallauncher.domain.LaunchableApp
 import com.example.minimallauncher.ui.settings.SettingsScreen
 import com.example.minimallauncher.ui.theme.LauncherTheme
 
-private enum class LauncherScreen { HOME, APPS, SETTINGS, INTENTIONAL_PILOT_APPS }
+private enum class LauncherScreen { HOME, SETTINGS, INTENTIONAL_PILOT_APPS }
 
 @Composable
 fun LauncherApp(
@@ -41,7 +50,13 @@ fun LauncherApp(
     val appDrawerListState = rememberLazyListState()
     var currentScreenName by rememberSaveable { mutableStateOf(LauncherScreen.HOME.name) }
     val currentScreen = LauncherScreen.valueOf(currentScreenName)
-    val openHome = { currentScreenName = LauncherScreen.HOME.name }
+    val pagerState = rememberPagerState(pageCount = { 2 })
+    val scope = rememberCoroutineScope()
+    val openHome: () -> Unit = {
+        currentScreenName = LauncherScreen.HOME.name
+        scope.launch { pagerState.animateScrollToPage(0) }
+        Unit
+    }
     var appPendingLaunch by androidx.compose.runtime.remember { mutableStateOf<LaunchableApp?>(null) }
 
     val handleAppLaunch: (LaunchableApp) -> Unit = { app ->
@@ -58,7 +73,7 @@ fun LauncherApp(
         }
     }
 
-    BackHandler(enabled = currentScreen != LauncherScreen.HOME, onBack = openHome)
+    BackHandler(enabled = currentScreen != LauncherScreen.HOME || pagerState.currentPage != 0 || pagerState.currentPageOffsetFraction != 0f, onBack = openHome)
 
     val view = LocalView.current
     LaunchedEffect(view, state.preferences.showStatusBar) {
@@ -73,7 +88,20 @@ fun LauncherApp(
     }
 
     LauncherTheme(preference = state.preferences.theme) {
-        Surface(modifier = Modifier.fillMaxSize()) {
+        val background = if (currentScreen == LauncherScreen.HOME && appPendingLaunch == null) {
+            lerp(Color.Black, MaterialTheme.colorScheme.surface,
+                (pagerState.currentPage + pagerState.currentPageOffsetFraction).coerceIn(0f, 1f))
+        } else {
+            MaterialTheme.colorScheme.surface
+        }
+        SideEffect {
+            val window = (view.context as? Activity)?.window
+            if (window != null) {
+                WindowInsetsControllerCompat(window, view).isAppearanceLightNavigationBars =
+                    background.luminance() > 0.5f
+            }
+        }
+        Surface(modifier = Modifier.fillMaxSize(), color = background) {
             val paddingModifier = if (state.preferences.showStatusBar) {
                 Modifier.systemBarsPadding()
             } else {
@@ -97,47 +125,44 @@ fun LauncherApp(
                     androidx.compose.animation.AnimatedContent(
                         targetState = currentScreen,
                         transitionSpec = {
-                            if (targetState == LauncherScreen.APPS && initialState == LauncherScreen.HOME) {
-                                androidx.compose.animation.slideInHorizontally(animationSpec = androidx.compose.animation.core.tween(250), initialOffsetX = { it }) +
-                                androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(250)) togetherWith
-                                androidx.compose.animation.slideOutHorizontally(animationSpec = androidx.compose.animation.core.tween(250), targetOffsetX = { -it / 3 }) +
+                            androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(250)) togetherWith
                                 androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(250))
-                            } else if (targetState == LauncherScreen.HOME && initialState == LauncherScreen.APPS) {
-                                androidx.compose.animation.slideInHorizontally(animationSpec = androidx.compose.animation.core.tween(250), initialOffsetX = { -it / 3 }) +
-                                androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(250)) togetherWith
-                                androidx.compose.animation.slideOutHorizontally(animationSpec = androidx.compose.animation.core.tween(250), targetOffsetX = { it }) +
-                                androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(250))
-                            } else {
-                                androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(250)) togetherWith 
-                                androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(250))
-                            }
                         },
                         label = "Screen Transition"
                     ) { screen ->
                         when (screen) {
-                            LauncherScreen.HOME -> HomeScreen(
-                                favoriteApps = state.favoriteApps,
-                                showDate = state.preferences.showDate,
-                                doubleTapToLock = state.preferences.doubleTapToLock,
-                                onOpenDrawer = { currentScreenName = LauncherScreen.APPS.name },
-                                onOpenNotifications = onOpenNotifications,
-                                onOpenSettings = { currentScreenName = LauncherScreen.SETTINGS.name },
-                                onSetDefaultLauncher = onOpenDefaultLauncherSettings,
-                                onLaunchApp = handleAppLaunch,
-                                onMoveFavorite = viewModel::moveFavorite,
-                                onRemoveFavorite = viewModel::removeFavorite,
-                            )
-                            LauncherScreen.APPS -> AppDrawerScreen(
-                                apps = state.apps,
-                                listState = appDrawerListState,
-                                autoOpenKeyboard = state.preferences.autoOpenKeyboard,
-                                isLoading = state.isLoadingApps,
-                                failedToLoad = state.appLoadError,
-                                favoriteKeys = state.preferences.favoriteAppKeys,
-                                onBack = openHome,
-                                onLaunchApp = handleAppLaunch,
-                                onToggleFavorite = viewModel::toggleFavorite,
-                            )
+                            LauncherScreen.HOME -> HorizontalPager(
+                                state = pagerState,
+                                modifier = Modifier.fillMaxSize(),
+                                beyondViewportPageCount = 1,
+                            ) { page ->
+                                if (page == 0) HomeScreen(
+                                    favoriteApps = state.favoriteApps,
+                                    showDate = state.preferences.showDate,
+                                    doubleTapToLock = state.preferences.doubleTapToLock,
+                                    onOpenNotifications = onOpenNotifications,
+                                    onOpenSettings = { currentScreenName = LauncherScreen.SETTINGS.name },
+                                    onSetDefaultLauncher = onOpenDefaultLauncherSettings,
+                                    onLaunchApp = handleAppLaunch,
+                                    onMoveFavorite = viewModel::moveFavorite,
+                                    onRemoveFavorite = viewModel::removeFavorite,
+                                )
+                                else Surface(modifier = Modifier.fillMaxSize()) {
+                                    AppDrawerScreen(
+                                        apps = state.apps,
+                                        listState = appDrawerListState,
+                                        autoOpenKeyboard = state.preferences.autoOpenKeyboard,
+                                        isActive = currentScreen == LauncherScreen.HOME &&
+                                            pagerState.settledPage == 1 && !pagerState.isScrollInProgress,
+                                        isLoading = state.isLoadingApps,
+                                        failedToLoad = state.appLoadError,
+                                        favoriteKeys = state.preferences.favoriteAppKeys,
+                                        onBack = openHome,
+                                        onLaunchApp = handleAppLaunch,
+                                        onToggleFavorite = viewModel::toggleFavorite,
+                                    )
+                                }
+                            }
                             LauncherScreen.SETTINGS -> SettingsScreen(
                                 showDate = state.preferences.showDate,
                                 autoOpenKeyboard = state.preferences.autoOpenKeyboard,

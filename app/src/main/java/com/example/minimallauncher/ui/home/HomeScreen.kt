@@ -5,7 +5,7 @@ import android.content.Intent
 import android.provider.Settings
 import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -22,7 +22,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -37,14 +36,12 @@ import com.example.minimallauncher.domain.LaunchableApp
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.abs
 
 @Composable
 fun HomeScreen(
     favoriteApps: List<LaunchableApp>,
     showDate: Boolean,
     doubleTapToLock: Boolean,
-    onOpenDrawer: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenSettings: () -> Unit,
     onSetDefaultLauncher: () -> Unit,
@@ -129,34 +126,20 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(onOpenDrawer, onOpenNotifications) {
-                var drag = Offset.Zero
+            .pointerInput(onOpenNotifications) {
+                var drag = 0f
                 var handled = false
                 val threshold = 72.dp.toPx()
-                detectDragGestures(
-                    onDrag = { _, amount ->
-                        if (!handled) {
-                            drag += amount
-                            when {
-                                drag.x < -threshold && abs(drag.x) > abs(drag.y) -> {
-                                    handled = true
-                                    onOpenDrawer()
-                                }
-                                drag.y > threshold && abs(drag.y) > abs(drag.x) -> {
-                                    handled = true
-                                    onOpenNotifications()
-                                }
-                            }
+                detectVerticalDragGestures(
+                    onVerticalDrag = { _, amount ->
+                        drag += amount
+                        if (!handled && drag > threshold) {
+                            handled = true
+                            onOpenNotifications()
                         }
                     },
-                    onDragEnd = {
-                        drag = Offset.Zero
-                        handled = false
-                    },
-                    onDragCancel = {
-                        drag = Offset.Zero
-                        handled = false
-                    },
+                    onDragEnd = { drag = 0f; handled = false },
+                    onDragCancel = { drag = 0f; handled = false },
                 )
             }
             .pointerInput(onOpenSettings) {

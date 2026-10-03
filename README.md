@@ -1,6 +1,6 @@
 # Minimal Launcher
 
-Minimal Launcher is a native Android home-screen replacement built with Kotlin and Jetpack Compose. It keeps the first screen deliberately quiet: a large clock, optional date, and a small list of favorite apps. Swipe up, or tap **All apps**, for an alphabetically sorted, searchable application drawer.
+Minimal Launcher is a native Android home-screen replacement built with Kotlin and Jetpack Compose. It keeps the first screen deliberately quiet: a large clock, optional date, and a small list of favorite apps. Swipe left for an alphabetically sorted, searchable application drawer; swipe right to return home. Both pages follow your finger, including during a slow swipe, pause, or reversal, and settle into place when you release.
 
 The launcher is entirely offline. It has no analytics, advertisements, news feed, network requirement, or broad package-query permission.
 

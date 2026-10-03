@@ -26,8 +26,6 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -74,6 +72,7 @@ fun AppDrawerScreen(
     onBack: () -> Unit,
     onLaunchApp: (LaunchableApp) -> Unit,
     onToggleFavorite: (LaunchableApp) -> Unit,
+    isActive: Boolean = true,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val filteredApps = remember(apps, query) { filterApps(apps, query) }
@@ -89,14 +88,11 @@ fun AppDrawerScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        if (autoOpenKeyboard) {
-            focusRequester.requestFocus()
-        }
-    }
-
-    LaunchedEffect(isAtTop) {
-        if (isAtTop && autoOpenKeyboard && !isImeVisible) {
+    // Offscreen pages are composed ahead of time; only focus a fully settled drawer.
+    LaunchedEffect(isActive, autoOpenKeyboard, isAtTop) {
+        if (!isActive) {
+            focusManager.clearFocus()
+        } else if (autoOpenKeyboard && isAtTop && !isImeVisible) {
             focusRequester.requestFocus()
         }
     }
@@ -119,20 +115,6 @@ fun AppDrawerScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(onBack) {
-                var horizontalDrag = 0f
-                detectHorizontalDragGestures(
-                    onHorizontalDrag = { _, dragAmount ->
-                        horizontalDrag += dragAmount
-                        if (horizontalDrag > 72f) {
-                            onBack()
-                            horizontalDrag = 0f
-                        }
-                    },
-                    onDragEnd = { horizontalDrag = 0f },
-                    onDragCancel = { horizontalDrag = 0f },
-                )
-            }
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         TextField(

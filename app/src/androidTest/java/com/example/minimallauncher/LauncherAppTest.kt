@@ -3,6 +3,8 @@ package com.example.minimallauncher
 import android.os.Process
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -24,6 +26,7 @@ import com.example.minimallauncher.ui.LauncherApp
 import com.example.minimallauncher.ui.LauncherViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -61,13 +64,63 @@ class LauncherAppTest {
         }
 
         composeRule.onRoot().performTouchInput { swipeLeft() }
-        composeRule.onNode(hasScrollToIndexAction()).performScrollToIndex(30)
+        composeRule.onNode(hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)).performScrollToIndex(30)
         composeRule.onNodeWithText("App 30").assertIsDisplayed()
 
         composeRule.onRoot().performTouchInput { swipeRight() }
         composeRule.onNodeWithContentDescription("Current time").assertIsDisplayed()
         composeRule.onRoot().performTouchInput { swipeLeft() }
         composeRule.onNodeWithText("App 30").assertIsDisplayed()
+    }
+
+    @Test
+    fun drawerTracksHeldSwipeAndCanReverseBeforeRelease() {
+        val viewModel = LauncherViewModel(
+            applicationsRepository = TestApplicationsRepository(),
+            preferencesRepository = TestPreferencesRepository(),
+        )
+        composeRule.setContent {
+            LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
+        }
+        val clock = composeRule.onNodeWithContentDescription("Current time")
+        val initialX = clock.fetchSemanticsNode().positionInRoot.x
+        composeRule.onRoot().performTouchInput {
+            down(Offset(width * 0.8f, height * 0.35f))
+            moveTo(Offset(width * 0.7f, height * 0.35f), delayMillis = 100)
+            moveTo(Offset(width * 0.4f, height * 0.35f), delayMillis = 400)
+        }
+        val pager = composeRule.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.HorizontalScrollAxisRange))
+        fun pageOffset() = pager.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange].value()
+        val viewportWidth = composeRule.onRoot().fetchSemanticsNode().size.width
+        val heldX = pageOffset()
+        assertTrue("Drawer should be partially revealed", heldX > viewportWidth * 0.2f && heldX < viewportWidth * 0.6f)
+        composeRule.mainClock.advanceTimeBy(500)
+        assertEquals(heldX, pageOffset(), 1f)
+        composeRule.onRoot().performTouchInput {
+            moveTo(Offset(width * 0.8f, height * 0.35f), delayMillis = 500)
+            advanceEventTime(300)
+            up()
+        }
+        clock.assertIsDisplayed()
+        assertEquals(initialX, clock.fetchSemanticsNode().positionInRoot.x, 1f)
+
+        composeRule.onRoot().performTouchInput { swipeLeft() }
+        val drawerX = pageOffset()
+        composeRule.onRoot().performTouchInput {
+            down(Offset(width * 0.2f, height * 0.35f))
+            moveTo(Offset(width * 0.3f, height * 0.35f), delayMillis = 100)
+            moveTo(Offset(width * 0.6f, height * 0.35f), delayMillis = 400)
+        }
+        val heldDrawerX = pageOffset()
+        assertTrue("Drawer should move with the return swipe", heldDrawerX < drawerX - 50f)
+        composeRule.mainClock.advanceTimeBy(500)
+        assertEquals(heldDrawerX, pageOffset(), 1f)
+        composeRule.onRoot().performTouchInput {
+            moveTo(Offset(width * 0.9f, height * 0.35f), delayMillis = 500)
+            advanceEventTime(300)
+            up()
+        }
+        clock.assertIsDisplayed()
     }
 
     @Test
@@ -156,8 +209,8 @@ class LauncherAppTest {
         }
 
         composeRule.onRoot().performTouchInput { swipeLeft() }
-        composeRule.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
-        composeRule.onNode(hasScrollToIndexAction()).performTouchInput { swipeDown() }
+        composeRule.onNode(hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)).performScrollToIndex(0)
+        composeRule.onNode(hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)).performTouchInput { swipeDown() }
 
         composeRule.onNodeWithText("App 00").assertIsDisplayed()
         composeRule.onNodeWithText("Search apps...").assertIsDisplayed()
