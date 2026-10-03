@@ -1,5 +1,7 @@
 package com.example.minimallauncher.ui.theme
 
+import androidx.compose.animation.animateColorAsState
+import com.example.minimallauncher.ui.motion.LauncherMotion
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -37,8 +39,19 @@ fun LauncherTheme(preference: ThemePreference, content: @Composable () -> Unit) 
         ThemePreference.LIGHT -> false
         ThemePreference.DARK -> true
     }
+    val target = if (darkTheme) DarkColors else LightColors
+    val colors = target.copy(
+        primary = animateColorAsState(target.primary, LauncherMotion.color(), label = "Primary color").value,
+        onPrimary = animateColorAsState(target.onPrimary, LauncherMotion.color(), label = "Primary text").value,
+        background = animateColorAsState(target.background, LauncherMotion.color(), label = "Background color").value,
+        onBackground = animateColorAsState(target.onBackground, LauncherMotion.color(), label = "Background text").value,
+        surface = animateColorAsState(target.surface, LauncherMotion.color(), label = "Surface color").value,
+        onSurface = animateColorAsState(target.onSurface, LauncherMotion.color(), label = "Surface text").value,
+        surfaceVariant = animateColorAsState(target.surfaceVariant, LauncherMotion.color(), label = "Secondary surface").value,
+        onSurfaceVariant = animateColorAsState(target.onSurfaceVariant, LauncherMotion.color(), label = "Secondary text").value,
+    )
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
+        colorScheme = colors,
         content = content,
     )
 }

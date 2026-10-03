@@ -1,5 +1,11 @@
 package com.example.minimallauncher.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import com.example.minimallauncher.ui.motion.LauncherMotion
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
@@ -167,13 +173,19 @@ fun HomeScreen(
                 color = Color.White,
                 modifier = Modifier.semantics { contentDescription = "Current time" },
             )
-            if (showDate) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = dateText,
-                    fontSize = 13.sp,
-                    color = Color.White,
-                )
+            AnimatedVisibility(
+                visible = showDate,
+                enter = expandVertically(LauncherMotion.settle()) + fadeIn(LauncherMotion.fade()),
+                exit = shrinkVertically(LauncherMotion.settle()) + fadeOut(LauncherMotion.fade()),
+            ) {
+                Column {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = dateText,
+                        fontSize = 13.sp,
+                        color = Color.White,
+                    )
+                }
             }
             BatteryStatus()
             if (!isDefaultLauncher) {

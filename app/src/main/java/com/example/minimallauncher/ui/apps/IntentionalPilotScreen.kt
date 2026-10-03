@@ -1,5 +1,10 @@
 package com.example.minimallauncher.ui.apps
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import com.example.minimallauncher.ui.motion.LauncherMotion
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -102,7 +107,13 @@ fun IntentionalPilotScreen(
                     enabled = remainingSeconds == 0,
                     modifier = Modifier.weight(1f).height(56.dp),
                 ) {
-                    Text(if (remainingSeconds > 0) "Wait ($remainingSeconds)" else "Open app")
+                    AnimatedContent(
+                        targetState = remainingSeconds,
+                        transitionSpec = { fadeIn(LauncherMotion.fade()) togetherWith fadeOut(LauncherMotion.fade()) },
+                        label = "Pause countdown",
+                    ) { seconds ->
+                        Text(if (seconds > 0) "Wait ($seconds)" else "Open app")
+                    }
                 }
             }
         }

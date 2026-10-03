@@ -1,5 +1,17 @@
 package com.example.minimallauncher.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import com.example.minimallauncher.ui.motion.LauncherMotion
+import com.example.minimallauncher.ui.motion.launcherPressFeedback
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Box
@@ -56,7 +68,6 @@ fun HomeFavorites(
     var draggingKey by remember { mutableStateOf<String?>(null) }
     var dragPosition by remember { mutableStateOf(Offset.Zero) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
-    var hasMoved by remember { mutableStateOf(false) }
     var dragOrigin by remember { mutableStateOf<Rect?>(null) }
     var previewOrder by remember { mutableStateOf<List<String>?>(null) }
     val rowBounds = remember { mutableStateMapOf<String, Rect>() }
@@ -64,6 +75,18 @@ fun HomeFavorites(
     var trashBounds by remember { mutableStateOf<Rect?>(null) }
     val listState = rememberLazyListState()
     val overTrash = draggingKey != null && trashBounds?.contains(dragPosition) == true
+    val haptics = LocalHapticFeedback.current
+    val liftScale = animateFloatAsState(
+        if (draggingKey != null) 1.035f else 1f,
+        LauncherMotion.settle(), label = "Favorite lift",
+    )
+    val trashColor by animateColorAsState(
+        if (overTrash) Color(0xFFFF7777) else Color.White,
+        LauncherMotion.color(), label = "Removal target",
+    )
+    LaunchedEffect(overTrash) {
+        if (overTrash) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
     val appsByKey = apps.associateBy { it.key }
     val visibleApps = previewOrder?.mapNotNull(appsByKey::get) ?: apps
 
@@ -79,31 +102,32 @@ fun HomeFavorites(
         ) {
             items(visibleApps, key = { it.key }) { app ->
                     val isDragging = draggingKey == app.key
+                    val interactions = remember(app.key) { MutableInteractionSource() }
                     Row(
-                        modifier = Modifier.animateItem().fillMaxWidth().heightIn(min = 48.dp)
+                        modifier = Modifier.animateItem(placementSpec = LauncherMotion.settle(), fadeInSpec = LauncherMotion.fade(), fadeOutSpec = LauncherMotion.fade()).fillMaxWidth().heightIn(min = 48.dp)
                             .onGloballyPositioned { coordinates ->
                                 if (!isDragging) rowBounds[app.key] = coordinates.boundsInRoot()
                             }
                             .graphicsLayer {
                                 alpha = if (isDragging) 0f else 1f
                             }
-                            .clickable { onLaunchApp(app) }
+                            .launcherPressFeedback(interactions)
+                            .clickable(interactionSource = interactions, indication = androidx.compose.material3.ripple()) { onLaunchApp(app) }
                             .pointerInput(app.key) {
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = { start ->
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                         val origin = rowBounds[app.key]
                                         dragOrigin = origin
                                         draggingKey = app.key
                                         previewOrder = apps.map { it.key }
                                         dragOffset = Offset.Zero
-                                        hasMoved = false
                                         dragPosition = origin?.topLeft?.plus(start) ?: start
                                     },
                                     onDrag = { change, amount ->
                                         change.consume()
                                         dragOffset += amount
                                         dragPosition += amount
-                                        if (amount != Offset.Zero) hasMoved = true
                                         val order = previewOrder ?: apps.map { it.key }
                                         val fromIndex = order.indexOf(app.key)
                                         val hoveredKey = order.firstOrNull { key ->
@@ -115,6 +139,7 @@ fun HomeFavorites(
                                                 (amount.y < 0 && targetIndex < fromIndex))
                                         ) {
                                             previewOrder = movedFavorite(order, app.key, hoveredKey)
+                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         }
                                     },
                                     onDragEnd = {
@@ -133,14 +158,12 @@ fun HomeFavorites(
                                         draggingKey = null
                                         dragOrigin = null
                                         dragOffset = Offset.Zero
-                                        hasMoved = false
                                     },
                                     onDragCancel = {
                                         draggingKey = null
                                         dragOrigin = null
                                         previewOrder = null
                                         dragOffset = Offset.Zero
-                                        hasMoved = false
                                     },
                                 )
                             }
@@ -152,9 +175,14 @@ fun HomeFavorites(
             }
         }
 
-        if (draggingKey != null) {
+        AnimatedVisibility(
+            visible = draggingKey != null,
+            modifier = Modifier.align(Alignment.BottomCenter).zIndex(1f),
+            enter = fadeIn(LauncherMotion.fade()) + scaleIn(LauncherMotion.settle(), initialScale = 0.85f),
+            exit = fadeOut(LauncherMotion.fade()) + scaleOut(LauncherMotion.settle(), targetScale = 0.85f),
+        ) {
             Box(
-                modifier = Modifier.align(Alignment.BottomCenter).size(64.dp).zIndex(1f)
+                modifier = Modifier.size(64.dp)
                     .onGloballyPositioned { trashBounds = it.boundsInRoot() }
                     .semantics { contentDescription = "Remove favorite" },
                 contentAlignment = Alignment.Center,
@@ -162,7 +190,7 @@ fun HomeFavorites(
                 Icon(
                     Icons.Default.Delete,
                     contentDescription = null,
-                    tint = if (overTrash) Color(0xFFFF7777) else Color.White,
+                    tint = trashColor,
                     modifier = Modifier.size(28.dp),
                 )
             }
@@ -170,7 +198,7 @@ fun HomeFavorites(
         val draggedApp = apps.firstOrNull { it.key == draggingKey }
         val origin = dragOrigin
         val container = containerBounds
-        if (hasMoved && draggedApp != null && origin != null && container != null) {
+        if (draggedApp != null && origin != null && container != null) {
             Row(
                 modifier = Modifier
                     .offset {
@@ -182,7 +210,9 @@ fun HomeFavorites(
                     .graphicsLayer {
                         translationX = dragOffset.x
                         translationY = dragOffset.y
-                        alpha = 0.55f
+                        scaleX = liftScale.value
+                        scaleY = liftScale.value
+                        alpha = 0.85f
                     }
                     .fillMaxWidth()
                     .heightIn(min = 48.dp),

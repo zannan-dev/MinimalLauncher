@@ -1,5 +1,15 @@
 package com.example.minimallauncher.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
+import androidx.compose.material3.FilterChip
+import com.example.minimallauncher.ui.motion.LauncherMotion
+import com.example.minimallauncher.ui.motion.launcherPressFeedback
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -82,7 +92,11 @@ fun SettingsScreen(
                     checked = isIntentionalPilotEnabled,
                     onCheckedChange = onIntentionalPilotEnabledChanged,
                 )
-                if (isIntentionalPilotEnabled) {
+                AnimatedVisibility(
+                    visible = isIntentionalPilotEnabled,
+                    enter = expandVertically(LauncherMotion.settle()) + fadeIn(LauncherMotion.fade()),
+                    exit = shrinkVertically(LauncherMotion.settle()) + fadeOut(LauncherMotion.fade()),
+                ) {
                     PreferenceRow(
                         title = "Select apps to delay",
                         subtitle = "Choose which apps ask you to pause before opening.",
@@ -94,12 +108,12 @@ fun SettingsScreen(
                 SettingsSectionTitle("Theme")
                 Row(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 16.dp)) {
                     ThemePreference.entries.forEach { choice ->
-                        TextButton(
+                        FilterChip(
+                            selected = choice == theme,
                             onClick = { onThemeChanged(choice) },
-                            modifier = Modifier.padding(end = 8.dp)
-                        ) {
-                            Text(if (choice == theme) "• ${choice.label}" else choice.label)
-                        }
+                            label = { Text(choice.label) },
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
                     }
                 }
 
@@ -147,12 +161,16 @@ private fun PreferenceToggle(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
+    val interactions = remember { MutableInteractionSource() }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
+            .launcherPressFeedback(interactions)
             .semantics { role = Role.Switch }
-            .toggleable(value = checked, onValueChange = onCheckedChange)
+            .toggleable(value = checked, interactionSource = interactions,
+                indication = androidx.compose.material3.ripple(), role = Role.Switch,
+                onValueChange = onCheckedChange)
             .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -177,10 +195,12 @@ private fun PreferenceRow(
     subtitle: String? = null,
     onClick: () -> Unit,
 ) {
+    val interactions = remember { MutableInteractionSource() }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .launcherPressFeedback(interactions)
+            .clickable(interactionSource = interactions, indication = androidx.compose.material3.ripple(), onClick = onClick)
             .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
         Text(title, style = MaterialTheme.typography.bodyLarge)

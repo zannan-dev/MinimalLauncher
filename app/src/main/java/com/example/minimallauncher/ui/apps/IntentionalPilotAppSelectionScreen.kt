@@ -1,6 +1,12 @@
 package com.example.minimallauncher.ui.apps
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import com.example.minimallauncher.ui.motion.LauncherMotion
+import com.example.minimallauncher.ui.motion.launcherPressFeedback
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -63,11 +69,16 @@ fun IntentionalPilotAppSelectionScreen(
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(apps, key = { it.key }) { app ->
+                    val interactions = remember(app.key) { MutableInteractionSource() }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
+                            .animateItem(placementSpec = LauncherMotion.settle())
                             .fillMaxWidth()
-                            .clickable { onToggleApp(app) }
+                            .launcherPressFeedback(interactions)
+                            .toggleable(value = app.key in selectedAppKeys,
+                                interactionSource = interactions, indication = androidx.compose.material3.ripple(),
+                                role = Role.Checkbox, onValueChange = { onToggleApp(app) })
                             .padding(horizontal = 24.dp, vertical = 12.dp)
                     ) {
                         Text(
@@ -78,7 +89,7 @@ fun IntentionalPilotAppSelectionScreen(
                         Spacer(Modifier.width(16.dp))
                         Checkbox(
                             checked = app.key in selectedAppKeys,
-                            onCheckedChange = { onToggleApp(app) }
+                            onCheckedChange = null
                         )
                     }
                 }

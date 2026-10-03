@@ -1,5 +1,13 @@
 package com.example.minimallauncher.ui.apps
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.example.minimallauncher.ui.motion.LauncherMotion
+import com.example.minimallauncher.ui.motion.launcherPressFeedback
 import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.clickable
@@ -85,6 +93,7 @@ fun AppDrawerScreen(
     onToggleFavorite: (LaunchableApp) -> Unit,
     isActive: Boolean = true,
     isPageMoving: Boolean = false,
+    homeRequest: Long = 0L,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val filteredApps = remember(apps, query) { filterApps(apps, query) }
@@ -100,6 +109,8 @@ fun AppDrawerScreen(
     var leftForSearchResult by rememberSaveable { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
     val drawerActive by rememberUpdatedState(isActive)
+    val latestHomeRequest by rememberUpdatedState(homeRequest)
+    var launchHomeRequest by rememberSaveable { mutableStateOf(homeRequest) }
     val windowFocused = LocalWindowInfo.current.isWindowFocused
     val isAtTop by remember(listState) {
         derivedStateOf {
@@ -116,6 +127,7 @@ fun AppDrawerScreen(
     }
     val launchApp: (LaunchableApp) -> Unit = { app ->
         resumeSearchOnReturn = query.isNotBlank()
+        launchHomeRequest = homeRequest
         leftForSearchResult = false
         dismissSearch()
         onLaunchApp(app)
@@ -131,7 +143,9 @@ fun AppDrawerScreen(
                     if (resumeSearchOnReturn && leftForSearchResult) {
                         resumeSearchOnReturn = false
                         leftForSearchResult = false
-                        if (drawerActive && query.isNotBlank()) focusOnEntry = true
+                        if (drawerActive && query.isNotBlank() && launchHomeRequest == latestHomeRequest) {
+                            focusOnEntry = true
+                        }
                     }
                 }
                 else -> Unit
@@ -139,6 +153,16 @@ fun AppDrawerScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(homeRequest) {
+        if (launchHomeRequest != homeRequest) {
+            resumeSearchOnReturn = false
+            leftForSearchResult = false
+            focusOnEntry = false
+            dismissSearch()
+            launchHomeRequest = homeRequest
+        }
     }
 
     // A completed drawer entry is independent of insets, filtering, and list movement.
@@ -257,6 +281,11 @@ fun AppDrawerScreen(
                         },
                         onLaunchApp = launchApp,
                         onToggleFavorite = onToggleFavorite,
+                        modifier = Modifier.animateItem(
+                            fadeInSpec = LauncherMotion.fade(),
+                            placementSpec = LauncherMotion.settle(),
+                            fadeOutSpec = LauncherMotion.fade(),
+                        ),
                     )
                 }
             }
@@ -273,15 +302,20 @@ private fun AppDrawerRow(
     onToggleOptions: (Boolean) -> Unit,
     onLaunchApp: (LaunchableApp) -> Unit,
     onToggleFavorite: (LaunchableApp) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val interactions = remember { MutableInteractionSource() }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 64.dp)
+            .launcherPressFeedback(interactions)
             .combinedClickable(
+                interactionSource = interactions,
+                indication = androidx.compose.material3.ripple(),
                 onClick = {
                     if (showOptions) {
                         onToggleOptions(false)
@@ -300,49 +334,55 @@ private fun AppDrawerRow(
             modifier = Modifier.weight(1f).padding(start = 16.dp, end = 16.dp),
         )
 
-        if (showOptions) {
-            IconButton(onClick = {
-                onToggleFavorite(app)
-                onToggleOptions(false)
-            }) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
-                    contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
-                )
-            }
-            IconButton(onClick = {
-                onToggleOptions(false)
-                try {
-                    val launcherApps = context.getSystemService(android.content.Context.LAUNCHER_APPS_SERVICE) as LauncherApps
-                    val component = ComponentName(app.packageName, app.activityName)
-                    launcherApps.startAppDetailsActivity(component, app.userHandle, null, null)
-                } catch (_: Exception) {
-                    try {
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                        intent.data = Uri.fromParts("package", app.packageName, null)
-                        context.startActivity(intent)
-                    } catch (_: Exception) {}
+        AnimatedVisibility(
+            visible = showOptions,
+            enter = fadeIn(LauncherMotion.fade()) + expandHorizontally(LauncherMotion.settle(), expandFrom = Alignment.End),
+            exit = fadeOut(LauncherMotion.fade()) + shrinkHorizontally(LauncherMotion.settle(), shrinkTowards = Alignment.End),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = {
+                    onToggleFavorite(app)
+                    onToggleOptions(false)
+                }) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                    )
                 }
-            }) {
-                Icon(imageVector = Icons.Default.Info, contentDescription = "Info")
-            }
-
-            if (!app.isSystemApp) {
                 IconButton(onClick = {
                     onToggleOptions(false)
                     try {
-                        val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE)
-                        intent.data = Uri.fromParts("package", app.packageName, null)
-                        intent.putExtra(Intent.EXTRA_USER, app.userHandle)
-                        context.startActivity(intent)
-                    } catch (_: Exception) {}
+                        val launcherApps = context.getSystemService(android.content.Context.LAUNCHER_APPS_SERVICE) as LauncherApps
+                        val component = ComponentName(app.packageName, app.activityName)
+                        launcherApps.startAppDetailsActivity(component, app.userHandle, null, null)
+                    } catch (_: Exception) {
+                        try {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            intent.data = Uri.fromParts("package", app.packageName, null)
+                            context.startActivity(intent)
+                        } catch (_: Exception) {}
+                    }
                 }) {
-                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Uninstall")
+                    Icon(imageVector = Icons.Default.Info, contentDescription = "Info")
                 }
-            }
 
-            IconButton(onClick = { onToggleOptions(false) }) {
-                Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                if (!app.isSystemApp) {
+                    IconButton(onClick = {
+                        onToggleOptions(false)
+                        try {
+                            val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE)
+                            intent.data = Uri.fromParts("package", app.packageName, null)
+                            intent.putExtra(Intent.EXTRA_USER, app.userHandle)
+                            context.startActivity(intent)
+                        } catch (_: Exception) {}
+                    }) {
+                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Uninstall")
+                    }
+                }
+
+                IconButton(onClick = { onToggleOptions(false) }) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                }
             }
         }
     }

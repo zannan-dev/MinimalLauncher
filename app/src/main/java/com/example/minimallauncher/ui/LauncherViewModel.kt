@@ -12,11 +12,8 @@ import com.example.minimallauncher.data.preferences.ThemePreference
 import com.example.minimallauncher.domain.LaunchableApp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
@@ -30,8 +27,9 @@ class LauncherViewModel(
     private val _uiState = MutableStateFlow(LauncherUiState())
     val uiState: StateFlow<LauncherUiState> = _uiState.asStateFlow()
 
-    private val _homeEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val homeEvents: SharedFlow<Unit> = _homeEvents.asSharedFlow()
+    // Retain Home requests even while the activity is stopped or its UI is being recreated.
+    private val _homeRequests = MutableStateFlow(0L)
+    val homeRequests: StateFlow<Long> = _homeRequests.asStateFlow()
     private var appRefreshJob: Job? = null
     private var refreshPending = false
 
@@ -41,7 +39,7 @@ class LauncherViewModel(
     }
 
     fun onHomePressed() {
-        _homeEvents.tryEmit(Unit)
+        _homeRequests.update { it + 1 }
     }
 
     init {

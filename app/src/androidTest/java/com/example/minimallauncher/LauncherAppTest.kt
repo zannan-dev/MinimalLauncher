@@ -2,7 +2,14 @@ package com.example.minimallauncher
 
 import android.os.Process
 import android.os.SystemClock
+import androidx.lifecycle.Lifecycle
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performClick
+import androidx.test.espresso.Espresso
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.core.view.ViewCompat
@@ -180,6 +187,56 @@ class LauncherAppTest {
     }
 
     @Test
+    fun cancellingPilotWithBackKeepsSearchQueryForTheNextDrawerVisit() {
+        val app = LaunchableApp("camera", "Activity", "Camera", Process.myUserHandle(), false)
+        val viewModel = LauncherViewModel(
+            applicationsRepository = TestApplicationsRepository(listOf(app)),
+            preferencesRepository = TestPreferencesRepository(intentionalPilotAppKeys = setOf(app.key)),
+        )
+        composeRule.setContent {
+            LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
+        }
+        composeRule.onRoot().performTouchInput { swipeLeft() }
+        composeRule.onNode(hasSetTextAction()).performTextInput("cam")
+        composeRule.onNodeWithText("Camera").performClick()
+        composeRule.onNodeWithText("Do you need to open Camera?").assertIsDisplayed()
+        Espresso.pressBack()
+        composeRule.onNodeWithContentDescription("Current time").assertIsDisplayed()
+        composeRule.onRoot().performTouchInput { swipeLeft() }
+        composeRule.onNode(hasSetTextAction() and hasText("cam")).assertIsDisplayed()
+    }
+
+    @Test
+    fun systemHomeAfterSearchLaunchStaysOnHomeWithoutKeyboard() {
+        val app = LaunchableApp("camera", "Activity", "Camera", Process.myUserHandle(), false)
+        val viewModel = LauncherViewModel(
+            applicationsRepository = TestApplicationsRepository(listOf(app)),
+            preferencesRepository = TestPreferencesRepository(autoOpenKeyboard = true),
+        )
+        composeRule.setContent {
+            LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
+        }
+        fun keyboardVisible() = ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
+            ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+
+        repeat(2) {
+            composeRule.onRoot().performTouchInput { swipeLeft() }
+            composeRule.onNode(hasSetTextAction()).performTextReplacement("cam")
+            composeRule.onNodeWithText("Camera").performClick()
+            // Emulate leaving for the result, then receiving Home while stopped.
+            composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+            viewModel.onHomePressed()
+            composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+            composeRule.onNodeWithContentDescription("Current time").assertIsDisplayed()
+            composeRule.waitUntil(5_000) { !keyboardVisible() }
+            val returnedAt = SystemClock.uptimeMillis()
+            composeRule.waitUntil(3_000) { SystemClock.uptimeMillis() - returnedAt >= 1_500 }
+            composeRule.onNodeWithContentDescription("Current time").assertIsDisplayed()
+            assertTrue("System Home must not restore the search keyboard", !keyboardVisible())
+        }
+    }
+
+    @Test
     fun downwardSwipeOnHomeOpensNotifications() {
         val viewModel = LauncherViewModel(
             applicationsRepository = TestApplicationsRepository(),
@@ -284,6 +341,7 @@ private class TestApplicationsRepository(
 private class TestPreferencesRepository(
     favorites: List<String> = emptyList(),
     autoOpenKeyboard: Boolean = false,
+    intentionalPilotAppKeys: Set<String> = emptySet(),
 ) : LauncherPreferencesRepository {
     private val state = MutableStateFlow(
         LauncherPreferences(
@@ -294,8 +352,8 @@ private class TestPreferencesRepository(
             autoOpenKeyboard = autoOpenKeyboard,
             doubleTapToLock = false,
             showStatusBar = true,
-            isIntentionalPilotEnabled = false,
-            intentionalPilotAppKeys = emptySet(),
+            isIntentionalPilotEnabled = intentionalPilotAppKeys.isNotEmpty(),
+            intentionalPilotAppKeys = intentionalPilotAppKeys,
         ),
     )
     override val preferences: Flow<LauncherPreferences> = state
