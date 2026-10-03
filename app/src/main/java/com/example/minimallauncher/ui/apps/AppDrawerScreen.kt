@@ -1,5 +1,10 @@
 package com.example.minimallauncher.ui.apps
 
+import com.example.minimallauncher.data.search.DeviceSearchRepository
+import com.example.minimallauncher.domain.DeviceSearchResult
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import android.widget.Toast
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
@@ -103,9 +108,37 @@ fun AppDrawerScreen(
     isActive: Boolean = true,
     isPageMoving: Boolean = false,
     homeRequest: Long = 0L,
+    deviceSearch: DeviceSearchRepository? = null,
+    contactsAllowed: Boolean = false,
+    contactsRevision: Int = 0,
+    onRequestContacts: () -> Unit = {},
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val filteredApps = remember(apps, query) { filterApps(apps, query) }
+    val context = LocalContext.current
+    val settingsResults = remember(deviceSearch, query) { deviceSearch?.settings(query).orEmpty() }
+    var contactQuery by remember { mutableStateOf("") }
+    var contactResults by remember { mutableStateOf(emptyList<DeviceSearchResult>()) }
+    var contactsLoading by remember { mutableStateOf(false) }
+    var contactsFailed by remember { mutableStateOf(false) }
+    val visibleContacts = if (contactsAllowed && contactQuery == query) contactResults else emptyList()
+    LaunchedEffect(query, contactsAllowed, contactsRevision, isActive) {
+        contactResults = emptyList()
+        contactsFailed = false
+        contactQuery = query
+        contactsLoading = deviceSearch != null && contactsAllowed && query.isNotBlank() && isActive
+        if (contactsLoading) {
+            try {
+                delay(120)
+                contactResults = deviceSearch!!.contacts(query)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                contactsFailed = true
+            }
+            contactsLoading = false
+        }
+    }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -140,6 +173,18 @@ fun AppDrawerScreen(
         leftForSearchResult = false
         dismissSearch()
         onLaunchApp(app)
+    }
+
+    val launchDeviceResult: (DeviceSearchResult) -> Unit = { result ->
+        resumeSearchOnReturn = query.isNotBlank()
+        launchHomeRequest = homeRequest
+        leftForSearchResult = false
+        dismissSearch()
+        if (deviceSearch?.open(result) != true) {
+            resumeSearchOnReturn = false
+            focusOnEntry = query.isNotBlank()
+            Toast.makeText(context, "Could not open ${result.title}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -243,8 +288,9 @@ fun AppDrawerScreen(
             failedToLoad && apps.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Could not load installed apps")
             }
-            filteredApps.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No matching apps")
+            filteredApps.isEmpty() && visibleContacts.isEmpty() && settingsResults.isEmpty() &&
+                !contactsLoading && !contactsFailed && (deviceSearch == null || contactsAllowed || query.isBlank()) -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(if (deviceSearch == null) "No matching apps" else "No results")
             }
             else -> LazyColumn(
                 state = listState,
@@ -252,7 +298,10 @@ fun AppDrawerScreen(
                 // Rows can pass beneath the floating controls; the last row can still scroll clear.
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 108.dp),
             ) {
-                items(filteredApps, key = { app -> app.key }) { app ->
+                if (deviceSearch != null && query.isNotBlank() && filteredApps.isNotEmpty()) {
+                    item(key = "section:apps") { SearchSectionLabel("Apps") }
+                }
+                items(filteredApps, key = { app -> "app:${app.key}" }) { app ->
                     AppDrawerRow(
                         app = app,
                         isFavorite = app.key in favoriteKeys,
@@ -268,6 +317,34 @@ fun AppDrawerScreen(
                             fadeOutSpec = LauncherMotion.fade(),
                         ),
                     )
+                }
+                if (query.isNotBlank() && deviceSearch != null) {
+                    if (visibleContacts.isNotEmpty() || !contactsAllowed || contactsLoading || contactsFailed) {
+                        item(key = "section:contacts") { SearchSectionLabel("Contacts") }
+                    }
+                    items(visibleContacts, key = { it.key }) { result ->
+                        DeviceResultRow(result, onClick = { launchDeviceResult(result) })
+                    }
+                    if (!contactsAllowed) {
+                        item(key = "contacts:permission") {
+                            DeviceResultRow(
+                                DeviceSearchResult("permission", "Search contacts", "Allow contacts access", ""),
+                                onClick = onRequestContacts,
+                            )
+                        }
+                    } else if (contactsLoading) {
+                        item(key = "contacts:loading") { Text("Searching contacts…", Modifier.padding(16.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    } else if (contactsFailed) {
+                        item(key = "contacts:error") { Text("Contacts unavailable", Modifier.padding(16.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                    if (settingsResults.isNotEmpty()) {
+                        item(key = "section:settings") { SearchSectionLabel("Settings") }
+                        items(settingsResults, key = { it.key }) { result ->
+                            DeviceResultRow(result, onClick = { launchDeviceResult(result) })
+                        }
+                    }
                 }
             }
         }
@@ -292,7 +369,7 @@ fun AppDrawerScreen(
             textStyle = MaterialTheme.typography.titleMedium,
             shape = RoundedCornerShape(percent = 50),
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            placeholder = { Text("Search apps...", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            placeholder = { Text(if (deviceSearch == null) "Search apps..." else "Search…", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = searchFill,
                 unfocusedContainerColor = searchFill,
@@ -307,7 +384,11 @@ fun AppDrawerScreen(
                         dismissSearch()
                         onBack()
                     } else {
-                        filteredApps.firstOrNull()?.let(launchApp)
+                        when {
+                            filteredApps.isNotEmpty() -> launchApp(filteredApps.first())
+                            visibleContacts.isNotEmpty() -> launchDeviceResult(visibleContacts.first())
+                            settingsResults.isNotEmpty() -> launchDeviceResult(settingsResults.first())
+                        }
                     }
                 }
             ),
@@ -414,5 +495,23 @@ private fun AppDrawerRow(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SearchSectionLabel(label: String) {
+    Text(label, modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
+        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun DeviceResultRow(result: DeviceSearchResult, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    Column(Modifier.fillMaxWidth().heightIn(min = 64.dp).launcherPressFeedback(interaction)
+        .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple(), onClick = onClick)
+        .padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Text(result.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(result.detail, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

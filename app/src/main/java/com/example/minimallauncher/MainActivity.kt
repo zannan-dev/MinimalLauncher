@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import com.example.minimallauncher.data.search.AndroidDeviceSearchRepository
 import com.example.minimallauncher.platform.InstalledAppsChangeObserver
 import com.example.minimallauncher.ui.LauncherApp
 import com.example.minimallauncher.ui.LauncherViewModel
@@ -17,6 +18,7 @@ class MainActivity : ComponentActivity() {
     private val viewModel: LauncherViewModel by viewModels {
         LauncherViewModelFactory(applicationContext)
     }
+    private val deviceSearch by lazy { AndroidDeviceSearchRepository(applicationContext) }
     private lateinit var appsChangeObserver: InstalledAppsChangeObserver
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,6 +33,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             LauncherApp(
                 viewModel = viewModel,
+                deviceSearch = deviceSearch,
                 onOpenDefaultLauncherSettings = ::openDefaultLauncherSettings,
                 onOpenNotifications = ::openNotifications,
             )

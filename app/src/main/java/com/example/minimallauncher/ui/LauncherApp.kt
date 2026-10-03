@@ -6,6 +6,21 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.runtime.remember
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.core.app.ActivityCompat
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.minimallauncher.data.search.DeviceSearchRepository
 import androidx.activity.compose.BackHandler
 import android.app.Activity
 import androidx.compose.foundation.pager.PagerDefaults
@@ -56,7 +71,39 @@ fun LauncherApp(
     viewModel: LauncherViewModel,
     onOpenDefaultLauncherSettings: () -> Unit,
     onOpenNotifications: () -> Unit,
+    deviceSearch: DeviceSearchRepository? = null,
 ) {
+    val context = LocalContext.current
+    fun hasContactsPermission() = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+    var contactsAllowed by remember { mutableStateOf(hasContactsPermission()) }
+    var contactsPermissionRequested by rememberSaveable { mutableStateOf(false) }
+    var contactsRevision by remember { mutableStateOf(0) }
+    val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        contactsAllowed = granted
+        contactsRevision++
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                contactsAllowed = hasContactsPermission()
+                contactsRevision++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val requestContacts = {
+        val activity = context as? Activity
+        if (!contactsPermissionRequested || activity == null ||
+            ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.READ_CONTACTS)) {
+            contactsPermissionRequested = true
+            contactsPermission.launch(Manifest.permission.READ_CONTACTS)
+        } else {
+            context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:${context.packageName}")))
+        }
+    }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val homeRequest by viewModel.homeRequests.collectAsState()
     var handledHomeRequest by rememberSaveable { mutableStateOf(0L) }
@@ -169,6 +216,10 @@ fun LauncherApp(
                             else Surface(modifier = Modifier.fillMaxSize()) {
                                 AppDrawerScreen(
                                     apps = state.apps,
+                                    deviceSearch = deviceSearch,
+                                    contactsAllowed = contactsAllowed,
+                                    contactsRevision = contactsRevision,
+                                    onRequestContacts = requestContacts,
                                     listState = appDrawerListState,
                                     autoOpenKeyboard = state.preferences.autoOpenKeyboard,
                                     homeRequest = homeRequest,
