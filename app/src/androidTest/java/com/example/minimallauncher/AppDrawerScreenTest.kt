@@ -83,7 +83,9 @@ class AppDrawerScreenTest {
         assertKeyboardStaysVisible()
         search.performTextClearance()
         search.performTextInput("No matching application")
-        composeRule.onNodeWithText("No matching apps").assertIsDisplayed()
+        composeRule.waitUntil(5_000) {
+            runCatching { composeRule.onNodeWithText("No matching apps").assertIsDisplayed() }.isSuccess
+        }
         search.assertIsFocused()
         assertKeyboardStaysVisible()
         search.performTextClearance()
