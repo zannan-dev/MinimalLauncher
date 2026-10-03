@@ -34,6 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -64,6 +66,8 @@ fun LauncherApp(
     val currentScreen = LauncherScreen.valueOf(currentScreenName)
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     var appPendingLaunch by remember { mutableStateOf<LaunchableApp?>(null) }
     var lastPendingApp by remember { mutableStateOf<LaunchableApp?>(null) }
     val openHome: () -> Unit = {
@@ -86,8 +90,11 @@ fun LauncherApp(
         if (returningHome) {
             appPendingLaunch = null
             currentScreenName = LauncherScreen.HOME.name
-            // System Home must settle before drawing, rather than animate the old drawer on resume.
-            pagerState.requestScrollToPage(0)
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+            // Keep the drawer inactive until the pager has actually settled on Home.
+            // A scheduled remeasure alone can briefly reactivate bottom search on resume.
+            pagerState.scrollToPage(0)
             handledHomeRequest = homeRequest
         }
     }

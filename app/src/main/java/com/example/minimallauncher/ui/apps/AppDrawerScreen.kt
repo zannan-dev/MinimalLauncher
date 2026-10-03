@@ -1,5 +1,6 @@
 package com.example.minimallauncher.ui.apps
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
@@ -10,7 +11,10 @@ import com.example.minimallauncher.ui.motion.LauncherMotion
 import com.example.minimallauncher.ui.motion.launcherPressFeedback
 import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
@@ -48,6 +53,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -65,6 +73,7 @@ import android.provider.Settings
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
@@ -214,49 +223,19 @@ fun AppDrawerScreen(
             keyboardController?.show()
         }
     }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .imePadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
-        TextField(
-            value = query,
-            onValueChange = {
-                focusOnReturnToTop = false
-                resumeSearchOnReturn = false
-                leftForSearchResult = false
-                query = it
-                listState.requestScrollToItem(0)
-            },
-            singleLine = true,
-            textStyle = MaterialTheme.typography.titleLarge,
-            placeholder = { Text("Search apps...", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-                unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
-            ),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-            keyboardActions = KeyboardActions(
-                onGo = {
-                    if (query.isEmpty()) {
-                        dismissSearch()
-                        onBack()
-                    } else {
-                        filteredApps.firstOrNull()?.let(launchApp)
-                    }
-                }
-            ),
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                .onFocusChanged {
-                    searchFocused = it.isFocused
-                    if (it.isFocused) focusOnReturnToTop = false
-                }
-                .focusRequester(focusRequester),
-        )
+    val searchInset by animateDpAsState(
+        targetValue = if (searchFocused) 16.dp else 32.dp,
+        animationSpec = LauncherMotion.settle(),
+        label = "Search pill width",
+    )
+    val searchHeight by animateDpAsState(
+        targetValue = if (searchFocused) 60.dp else 56.dp,
+        animationSpec = LauncherMotion.settle(),
+        label = "Search pill height",
+    )
+    // An opaque, theme-derived fill keeps text underneath from showing through the pill.
+    val searchFill = lerp(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surfaceVariant, 0.65f)
+    Box(modifier = Modifier.fillMaxSize().imePadding()) {
         when {
             isLoading && apps.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
@@ -269,7 +248,9 @@ fun AppDrawerScreen(
             }
             else -> LazyColumn(
                 state = listState,
-                modifier = Modifier.weight(1f).nestedScroll(searchScrollConnection).padding(top = 8.dp)
+                modifier = Modifier.fillMaxSize().nestedScroll(searchScrollConnection),
+                // Rows can pass beneath the floating controls; the last row can still scroll clear.
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 108.dp),
             ) {
                 items(filteredApps, key = { app -> app.key }) { app ->
                     AppDrawerRow(
@@ -290,6 +271,54 @@ fun AppDrawerScreen(
                 }
             }
         }
+        Box(
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(140.dp)
+                .background(Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.45f to Color.Black.copy(alpha = 0.12f),
+                    1f to Color.Black.copy(alpha = 0.5f),
+                )),
+        )
+        TextField(
+            value = query,
+            onValueChange = {
+                focusOnReturnToTop = false
+                resumeSearchOnReturn = false
+                leftForSearchResult = false
+                query = it
+                listState.requestScrollToItem(0)
+            },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.titleMedium,
+            shape = RoundedCornerShape(percent = 50),
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            placeholder = { Text("Search apps...", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = searchFill,
+                unfocusedContainerColor = searchFill,
+                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
+            ),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(
+                onGo = {
+                    if (query.isEmpty()) {
+                        dismissSearch()
+                        onBack()
+                    } else {
+                        filteredApps.firstOrNull()?.let(launchApp)
+                    }
+                }
+            ),
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .padding(horizontal = searchInset, vertical = 16.dp).height(searchHeight)
+                .onFocusChanged {
+                    searchFocused = it.isFocused
+                    if (it.isFocused) focusOnReturnToTop = false
+                }
+                .focusRequester(focusRequester),
+        )
     }
 }
 
