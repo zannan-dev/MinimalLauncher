@@ -1,7 +1,12 @@
 package com.example.minimallauncher
 
 import android.os.Process
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -124,6 +129,57 @@ class LauncherAppTest {
     }
 
     @Test
+    fun autoKeyboardReturnsAtTopAndOnReentryButStaysHiddenWhileBrowsing() {
+        val user = Process.myUserHandle()
+        val apps = (0..40).map { index ->
+            LaunchableApp("app$index", "Activity$index", "App %02d".format(index), user, false)
+        }
+        val viewModel = LauncherViewModel(
+            applicationsRepository = TestApplicationsRepository(apps),
+            preferencesRepository = TestPreferencesRepository(autoOpenKeyboard = true),
+        )
+        composeRule.setContent {
+            LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
+        }
+        fun keyboardVisible() = ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
+            ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+
+        composeRule.onRoot().performTouchInput { swipeLeft() }
+        val search = composeRule.onNodeWithText("Search apps...")
+        search.assertIsFocused()
+        composeRule.waitUntil(5_000) { keyboardVisible() }
+        val list = composeRule.onNode(hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
+        list.performTouchInput {
+            swipe(Offset(center.x, height * 0.35f), Offset(center.x, height * 0.05f), durationMillis = 400)
+        }
+        search.assertIsNotFocused()
+        composeRule.waitUntil(5_000) { !keyboardVisible() }
+        list.performTouchInput {
+            swipe(Offset(center.x, height * 0.35f), Offset(center.x, height * 0.05f), durationMillis = 400)
+        }
+        assertTrue("The app list must actually scroll", list.fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange].value() > 0f)
+        val afterScroll = SystemClock.uptimeMillis()
+        composeRule.waitUntil(3_000) { SystemClock.uptimeMillis() - afterScroll >= 1_500 }
+        search.assertIsNotFocused()
+        assertTrue("Keyboard must stay hidden after scrolling", !keyboardVisible())
+        list.performScrollToIndex(0)
+        search.assertIsFocused()
+        composeRule.waitUntil(5_000) { keyboardVisible() }
+        list.performTouchInput {
+            swipe(Offset(center.x, height * 0.35f), Offset(center.x, height * 0.05f), durationMillis = 400)
+        }
+        search.assertIsNotFocused()
+        composeRule.waitUntil(5_000) { !keyboardVisible() }
+
+        composeRule.onRoot().performTouchInput { swipeRight() }
+        composeRule.onNodeWithContentDescription("Current time").assertIsDisplayed()
+        composeRule.onRoot().performTouchInput { swipeLeft() }
+        search.assertIsFocused()
+        composeRule.waitUntil(5_000) { keyboardVisible() }
+    }
+
+    @Test
     fun downwardSwipeOnHomeOpensNotifications() {
         val viewModel = LauncherViewModel(
             applicationsRepository = TestApplicationsRepository(),
@@ -227,6 +283,7 @@ private class TestApplicationsRepository(
 
 private class TestPreferencesRepository(
     favorites: List<String> = emptyList(),
+    autoOpenKeyboard: Boolean = false,
 ) : LauncherPreferencesRepository {
     private val state = MutableStateFlow(
         LauncherPreferences(
@@ -234,7 +291,7 @@ private class TestPreferencesRepository(
             theme = ThemePreference.LIGHT,
             favoriteAppKeys = favorites.toSet(),
             favoriteAppOrder = favorites,
-            autoOpenKeyboard = false,
+            autoOpenKeyboard = autoOpenKeyboard,
             doubleTapToLock = false,
             showStatusBar = true,
             isIntentionalPilotEnabled = false,

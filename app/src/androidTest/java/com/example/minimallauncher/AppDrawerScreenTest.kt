@@ -1,7 +1,21 @@
 package com.example.minimallauncher
 
 import androidx.activity.ComponentActivity
+import androidx.lifecycle.Lifecycle
 import android.os.Process
+import android.os.SystemClock
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.swipeUp
+import androidx.test.espresso.Espresso
+import org.junit.Assert.assertFalse
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -50,6 +64,142 @@ class AppDrawerScreenTest {
         composeRule.onNodeWithText("Camera").assertIsDisplayed().performClick()
 
         assertEquals(camera, launched)
+    }
+
+    @Test
+    fun filteringAndClearingSearchDoNotDismissKeyboard() {
+        showSearchDrawer(autoOpenKeyboard = true)
+        val search = composeRule.onNode(hasSetTextAction())
+        val list = composeRule.onNode(hasScrollToIndexAction())
+        waitForKeyboard(true)
+        list.performTouchInput { swipeUp() }
+        waitForKeyboard(false)
+        list.performScrollToIndex(50)
+        search.performClick()
+        waitForKeyboard(true)
+        search.performTextInput("App 59")
+        composeRule.onNode(hasText("App 59") and !hasSetTextAction()).assertIsDisplayed()
+        search.assertIsFocused()
+        assertKeyboardStaysVisible()
+        search.performTextClearance()
+        search.performTextInput("No matching application")
+        composeRule.onNodeWithText("No matching apps").assertIsDisplayed()
+        search.assertIsFocused()
+        assertKeyboardStaysVisible()
+        search.performTextClearance()
+        composeRule.onNodeWithText("App 00").assertIsDisplayed()
+        search.assertIsFocused()
+        assertKeyboardStaysVisible()
+    }
+
+    @Test
+    fun disablingAutoKeyboardKeepsTopUnfocusedUntilSearchIsTapped() {
+        showSearchDrawer(autoOpenKeyboard = false)
+        val search = composeRule.onNode(hasSetTextAction())
+        val list = composeRule.onNode(hasScrollToIndexAction())
+        search.assertIsNotFocused()
+        search.performClick()
+        waitForKeyboard(true)
+        list.performTouchInput { swipeUp() }
+        waitForKeyboard(false)
+        list.performScrollToIndex(0)
+        waitForKeyboardToSettle()
+        search.assertIsNotFocused()
+        assertFalse(keyboardVisible())
+        search.performClick()
+        search.assertIsFocused()
+        waitForKeyboard(true)
+    }
+
+    @Test
+    fun backDismissedKeyboardStaysHiddenUntilSearchIsTapped() {
+        showSearchDrawer(autoOpenKeyboard = true)
+        waitForKeyboard(true)
+        Espresso.pressBack()
+        waitForKeyboard(false)
+        waitForKeyboardToSettle()
+        assertFalse(keyboardVisible())
+        composeRule.onNode(hasSetTextAction()).performClick()
+        waitForKeyboard(true)
+    }
+
+    @Test
+    fun returningFromSearchResultRestoresSearchWithAutoKeyboardEnabled() {
+        verifyReturnFromSearchResult(autoOpenKeyboard = true)
+    }
+
+    @Test
+    fun returningFromSearchResultRestoresManualSearchWithAutoKeyboardDisabled() {
+        verifyReturnFromSearchResult(autoOpenKeyboard = false)
+    }
+
+    private fun verifyReturnFromSearchResult(autoOpenKeyboard: Boolean) {
+        var launched: LaunchableApp? = null
+        showSearchDrawer(autoOpenKeyboard) { launched = it }
+        val search = composeRule.onNode(hasSetTextAction())
+        search.performTextInput("App 59")
+        waitForKeyboard(true)
+        composeRule.onNode(hasText("App 59") and !hasSetTextAction()).performClick()
+        assertEquals("app59", launched?.packageName)
+        search.assertIsNotFocused()
+        // Model the launcher losing its foreground activity while the result app is open.
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        waitForKeyboard(true)
+        search.assertIsFocused()
+        search.assertIsDisplayed()
+        composeRule.onNode(hasText("App 59") and !hasSetTextAction()).assertIsDisplayed()
+        assertKeyboardStaysVisible()
+    }
+
+    @Test
+    fun returningFromUnfilteredAppDoesNotStartSearchWithAutoKeyboardDisabled() {
+        showSearchDrawer(autoOpenKeyboard = false)
+        composeRule.onNodeWithText("App 00").performClick()
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        waitForKeyboardToSettle()
+        composeRule.onNode(hasSetTextAction()).assertIsNotFocused()
+        assertFalse(keyboardVisible())
+    }
+
+    private fun showSearchDrawer(autoOpenKeyboard: Boolean, onLaunchApp: (LaunchableApp) -> Unit = {}) {
+        val apps = (0..59).map { index ->
+            LaunchableApp("app$index", "Activity", "App %02d".format(index), Process.myUserHandle(), false)
+        }
+        composeRule.setContent {
+            LauncherTheme(preference = ThemePreference.LIGHT) {
+                AppDrawerScreen(
+                    apps = apps,
+                    listState = rememberLazyListState(),
+                    autoOpenKeyboard = autoOpenKeyboard,
+                    isLoading = false,
+                    failedToLoad = false,
+                    favoriteKeys = emptySet(),
+                    onBack = {},
+                    onLaunchApp = onLaunchApp,
+                    onToggleFavorite = {},
+                )
+            }
+        }
+    }
+
+    private fun keyboardVisible() = ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
+        ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+
+    private fun waitForKeyboard(visible: Boolean) {
+        composeRule.waitUntil(5_000) { keyboardVisible() == visible }
+    }
+
+    private fun waitForKeyboardToSettle() {
+        val start = SystemClock.uptimeMillis()
+        composeRule.waitUntil(3_000) { SystemClock.uptimeMillis() - start >= 1_500 }
+    }
+
+    private fun assertKeyboardStaysVisible() {
+        waitForKeyboard(true)
+        waitForKeyboardToSettle()
+        org.junit.Assert.assertTrue(keyboardVisible())
     }
 
     @Test

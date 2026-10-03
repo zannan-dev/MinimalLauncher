@@ -1,17 +1,17 @@
 package com.example.minimallauncher.ui.apps
 
+import androidx.compose.foundation.gestures.stopScroll
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,17 +26,25 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,11 +64,14 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalContext
 import com.example.minimallauncher.domain.LaunchableApp
 import com.example.minimallauncher.domain.filterApps
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AppDrawerScreen(
     apps: List<LaunchableApp>,
@@ -73,53 +84,127 @@ fun AppDrawerScreen(
     onLaunchApp: (LaunchableApp) -> Unit,
     onToggleFavorite: (LaunchableApp) -> Unit,
     isActive: Boolean = true,
+    isPageMoving: Boolean = false,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val filteredApps = remember(apps, query) { filterApps(apps, query) }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-    val isImeVisible = WindowInsets.isImeVisible
-    var wasImeVisible by remember { mutableStateOf(false) }
+    val keyboardController = LocalSoftwareKeyboardController.current
     var optionsAppKey by rememberSaveable { mutableStateOf<String?>(null) }
 
-    val isAtTop by remember {
+    var searchFocused by remember { mutableStateOf(false) }
+    var focusOnReturnToTop by remember { mutableStateOf(false) }
+    var focusOnEntry by remember { mutableStateOf(false) }
+    var resumeSearchOnReturn by rememberSaveable { mutableStateOf(false) }
+    var leftForSearchResult by rememberSaveable { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val drawerActive by rememberUpdatedState(isActive)
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
+    val isAtTop by remember(listState) {
         derivedStateOf {
             listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
         }
     }
+    val isListDragged by listState.interactionSource.collectIsDraggedAsState()
+    val dismissSearch = {
+        focusOnReturnToTop = false
+        if (searchFocused) {
+            focusManager.clearFocus()
+            keyboardController?.hide()
+        }
+    }
+    val launchApp: (LaunchableApp) -> Unit = { app ->
+        resumeSearchOnReturn = query.isNotBlank()
+        leftForSearchResult = false
+        dismissSearch()
+        onLaunchApp(app)
+    }
 
-    // Offscreen pages are composed ahead of time; only focus a fully settled drawer.
-    LaunchedEffect(isActive, autoOpenKeyboard, isAtTop) {
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    if (resumeSearchOnReturn) leftForSearchResult = true
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    if (resumeSearchOnReturn && leftForSearchResult) {
+                        resumeSearchOnReturn = false
+                        leftForSearchResult = false
+                        if (drawerActive && query.isNotBlank()) focusOnEntry = true
+                    }
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // A completed drawer entry is independent of insets, filtering, and list movement.
+    LaunchedEffect(isActive, autoOpenKeyboard) {
+        focusOnReturnToTop = false
+        focusOnEntry = isActive && autoOpenKeyboard
         if (!isActive) {
-            focusManager.clearFocus()
-        } else if (autoOpenKeyboard && isAtTop && !isImeVisible) {
+            resumeSearchOnReturn = false
+            leftForSearchResult = false
+            dismissSearch()
+        }
+    }
+    LaunchedEffect(focusOnEntry, isPageMoving, windowFocused, isActive) {
+        if (focusOnEntry && isActive && !isPageMoving && windowFocused) {
+            listState.stopScroll()
+            focusOnEntry = false
             focusRequester.requestFocus()
+            keyboardController?.show()
         }
     }
-
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress && !isAtTop) {
-            focusManager.clearFocus()
-        }
+    LaunchedEffect(isPageMoving) {
+        if (isPageMoving) dismissSearch()
     }
 
-    LaunchedEffect(isImeVisible) {
-        if (isImeVisible) {
-            wasImeVisible = true
-        } else if (wasImeVisible) {
-            // focusManager.clearFocus() // Remove this line
-            wasImeVisible = false
+    // Only a user gesture can dismiss search or arm automatic focus at the top.
+    // Filtering, IME resizing, and restoring scroll position are not gestures.
+    val searchScrollConnection = remember(listState, isActive, autoOpenKeyboard) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (isActive && source == NestedScrollSource.UserInput && available.y != 0f) {
+                    if (searchFocused) {
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                    }
+                    if (autoOpenKeyboard && (!isAtTop || available.y < 0f)) {
+                        focusOnReturnToTop = true
+                    }
+                }
+                return Offset.Zero
+            }
         }
     }
-
+    LaunchedEffect(isActive, autoOpenKeyboard, focusOnReturnToTop, isAtTop,
+        listState.isScrollInProgress, isListDragged) {
+        if (isActive && autoOpenKeyboard && focusOnReturnToTop && isAtTop &&
+            !listState.isScrollInProgress && !isListDragged && !isPageMoving) {
+            focusOnReturnToTop = false
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         TextField(
             value = query,
-            onValueChange = { query = it },
+            onValueChange = {
+                focusOnReturnToTop = false
+                resumeSearchOnReturn = false
+                leftForSearchResult = false
+                query = it
+                listState.requestScrollToItem(0)
+            },
             singleLine = true,
             textStyle = MaterialTheme.typography.titleLarge,
             placeholder = { Text("Search apps...", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
@@ -134,13 +219,19 @@ fun AppDrawerScreen(
             keyboardActions = KeyboardActions(
                 onGo = {
                     if (query.isEmpty()) {
+                        dismissSearch()
                         onBack()
                     } else {
-                        filteredApps.firstOrNull()?.let { onLaunchApp(it) }
+                        filteredApps.firstOrNull()?.let(launchApp)
                     }
                 }
             ),
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp).focusRequester(focusRequester),
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                .onFocusChanged {
+                    searchFocused = it.isFocused
+                    if (it.isFocused) focusOnReturnToTop = false
+                }
+                .focusRequester(focusRequester),
         )
         when {
             isLoading && apps.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -154,7 +245,7 @@ fun AppDrawerScreen(
             }
             else -> LazyColumn(
                 state = listState,
-                modifier = Modifier.weight(1f).padding(top = 8.dp)
+                modifier = Modifier.weight(1f).nestedScroll(searchScrollConnection).padding(top = 8.dp)
             ) {
                 items(filteredApps, key = { app -> app.key }) { app ->
                     AppDrawerRow(
@@ -164,7 +255,7 @@ fun AppDrawerScreen(
                         onToggleOptions = { show ->
                             optionsAppKey = if (show) app.key else null
                         },
-                        onLaunchApp = onLaunchApp,
+                        onLaunchApp = launchApp,
                         onToggleFavorite = onToggleFavorite,
                     )
                 }

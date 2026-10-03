@@ -153,7 +153,8 @@ fun LauncherApp(
                                         listState = appDrawerListState,
                                         autoOpenKeyboard = state.preferences.autoOpenKeyboard,
                                         isActive = currentScreen == LauncherScreen.HOME &&
-                                            pagerState.settledPage == 1 && !pagerState.isScrollInProgress,
+                                            pagerState.settledPage == 1,
+                                        isPageMoving = pagerState.currentPageOffsetFraction != 0f,
                                         isLoading = state.isLoadingApps,
                                         failedToLoad = state.appLoadError,
                                         favoriteKeys = state.preferences.favoriteAppKeys,
