@@ -16,7 +16,7 @@ import androidx.lifecycle.Lifecycle
 import com.example.minimallauncher.data.search.DeviceSearchRepository
 import com.example.minimallauncher.domain.DeviceSearchResult
 import com.example.minimallauncher.domain.LaunchableApp
-import com.example.minimallauncher.ui.apps.AppDrawerScreen
+import com.example.minimallauncher.ui.apps.HomeSearchScreen
 import com.example.minimallauncher.ui.theme.LauncherTheme
 import com.example.minimallauncher.data.preferences.ThemePreference
 import kotlinx.coroutines.CompletableDeferred
@@ -46,7 +46,7 @@ class UnifiedSearchTest {
     private fun show(search: FakeSearch, allowed: androidx.compose.runtime.State<Boolean>, revision: androidx.compose.runtime.State<Int> = mutableStateOf(0), request: () -> Unit = {}) {
         composeRule.setContent {
             LauncherTheme(ThemePreference.LIGHT) {
-                AppDrawerScreen(
+                HomeSearchScreen(
                     apps = listOf(LaunchableApp("camera", "Activity", "Camera", Process.myUserHandle(), false)),
                     listState = rememberLazyListState(), autoOpenKeyboard = false,
                     isLoading = false, failedToLoad = false, favoriteKeys = emptySet(),

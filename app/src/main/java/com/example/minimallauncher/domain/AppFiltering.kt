@@ -3,7 +3,7 @@ package com.example.minimallauncher.domain
 import java.text.Collator
 import java.text.Normalizer
 
-/** Returns a stable, case-insensitive, locale-aware alphabetical ordering for the app drawer. */
+/** Returns a stable, case-insensitive, locale-aware alphabetical ordering for the app list. */
 fun sortApps(apps: Iterable<LaunchableApp>): List<LaunchableApp> {
     val collator = Collator.getInstance()
     return apps.sortedWith(

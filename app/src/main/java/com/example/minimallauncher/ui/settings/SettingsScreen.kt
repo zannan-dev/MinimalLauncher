@@ -71,7 +71,7 @@ fun SettingsScreen(
                     onCheckedChange = onShowDateChanged,
                 )
                 PreferenceToggle(
-                    title = "Auto-open keyboard in app drawer",
+                    title = "Refocus search when returning to top",
                     checked = autoOpenKeyboard,
                     onCheckedChange = onAutoOpenKeyboardChanged,
                 )

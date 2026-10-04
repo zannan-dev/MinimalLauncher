@@ -90,7 +90,7 @@ class HomeFavoritesTest {
         var apps by mutableStateOf(listOf(camera))
         composeRule.setContent {
             HomeScreen(favoriteApps = apps, showDate = false, doubleTapToLock = false,
-                onOpenNotifications = {}, onOpenSettings = {}, onSetDefaultLauncher = {}, onLaunchApp = {},
+                onOpenSearch = {}, onOpenSettings = {}, onSetDefaultLauncher = {}, onLaunchApp = {},
                 onMoveFavorite = { _, _ -> }, onRemoveFavorite = { apps = apps - it },
                 assistantContent = { Box(Modifier.size(96.dp).semantics { contentDescription = "Test assistant" }) })
         }
@@ -112,7 +112,7 @@ class HomeFavoritesTest {
     @Test fun cancellingHomeDragRestoresAssistantWithoutRemovingFavorite() {
         composeRule.setContent {
             HomeScreen(favoriteApps = listOf(camera), showDate = false, doubleTapToLock = false,
-                onOpenNotifications = {}, onOpenSettings = {}, onSetDefaultLauncher = {}, onLaunchApp = {},
+                onOpenSearch = {}, onOpenSettings = {}, onSetDefaultLauncher = {}, onLaunchApp = {},
                 onMoveFavorite = { _, _ -> }, onRemoveFavorite = { error("Cancelled drag removed a favorite") },
                 assistantContent = { Box(Modifier.size(96.dp).semantics { contentDescription = "Test assistant" }) })
         }

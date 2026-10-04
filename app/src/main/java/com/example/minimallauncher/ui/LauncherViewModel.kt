@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Coordinates the small amount of state shared by the home screen, drawer, and settings. */
+/** Coordinates the small amount of state shared by the home screen, search, and settings. */
 class LauncherViewModel(
     private val applicationsRepository: ApplicationsRepository,
     private val preferencesRepository: LauncherPreferencesRepository,

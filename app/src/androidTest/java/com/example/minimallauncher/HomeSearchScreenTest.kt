@@ -27,13 +27,13 @@ import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import com.example.minimallauncher.data.preferences.ThemePreference
 import com.example.minimallauncher.domain.LaunchableApp
-import com.example.minimallauncher.ui.apps.AppDrawerScreen
+import com.example.minimallauncher.ui.apps.HomeSearchScreen
 import com.example.minimallauncher.ui.theme.LauncherTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-class AppDrawerScreenTest {
+class HomeSearchScreenTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
@@ -46,7 +46,7 @@ class AppDrawerScreenTest {
 
         composeRule.setContent {
             LauncherTheme(preference = ThemePreference.LIGHT) {
-                AppDrawerScreen(
+                HomeSearchScreen(
                     apps = listOf(camera, phone),
                     listState = rememberLazyListState(),
                     autoOpenKeyboard = false,
@@ -68,7 +68,7 @@ class AppDrawerScreenTest {
 
     @Test
     fun filteringAndClearingSearchDoNotDismissKeyboard() {
-        showSearchDrawer(autoOpenKeyboard = true)
+        showSearch(autoOpenKeyboard = true)
         val search = composeRule.onNode(hasSetTextAction())
         val list = composeRule.onNode(hasScrollToIndexAction())
         waitForKeyboard(true)
@@ -96,7 +96,7 @@ class AppDrawerScreenTest {
 
     @Test
     fun disablingAutoKeyboardKeepsTopUnfocusedUntilSearchIsTapped() {
-        showSearchDrawer(autoOpenKeyboard = false)
+        showSearch(autoOpenKeyboard = false)
         val search = composeRule.onNode(hasSetTextAction())
         val list = composeRule.onNode(hasScrollToIndexAction())
         search.assertIsNotFocused()
@@ -115,7 +115,7 @@ class AppDrawerScreenTest {
 
     @Test
     fun backDismissedKeyboardStaysHiddenUntilSearchIsTapped() {
-        showSearchDrawer(autoOpenKeyboard = true)
+        showSearch(autoOpenKeyboard = true)
         waitForKeyboard(true)
         Espresso.pressBack()
         waitForKeyboard(false)
@@ -137,7 +137,7 @@ class AppDrawerScreenTest {
 
     private fun verifyReturnFromSearchResult(autoOpenKeyboard: Boolean) {
         var launched: LaunchableApp? = null
-        showSearchDrawer(autoOpenKeyboard) { launched = it }
+        showSearch(autoOpenKeyboard) { launched = it }
         val search = composeRule.onNode(hasSetTextAction())
         search.performTextInput("App 59")
         waitForKeyboard(true)
@@ -156,7 +156,7 @@ class AppDrawerScreenTest {
 
     @Test
     fun returningFromUnfilteredAppDoesNotStartSearchWithAutoKeyboardDisabled() {
-        showSearchDrawer(autoOpenKeyboard = false)
+        showSearch(autoOpenKeyboard = false)
         composeRule.onNodeWithText("App 00").performClick()
         composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
         composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
@@ -165,13 +165,13 @@ class AppDrawerScreenTest {
         assertFalse(keyboardVisible())
     }
 
-    private fun showSearchDrawer(autoOpenKeyboard: Boolean, onLaunchApp: (LaunchableApp) -> Unit = {}) {
+    private fun showSearch(autoOpenKeyboard: Boolean, onLaunchApp: (LaunchableApp) -> Unit = {}) {
         val apps = (0..59).map { index ->
             LaunchableApp("app$index", "Activity", "App %02d".format(index), Process.myUserHandle(), false)
         }
         composeRule.setContent {
             LauncherTheme(preference = ThemePreference.LIGHT) {
-                AppDrawerScreen(
+                HomeSearchScreen(
                     apps = apps,
                     listState = rememberLazyListState(),
                     autoOpenKeyboard = autoOpenKeyboard,
@@ -210,7 +210,7 @@ class AppDrawerScreenTest {
         var favorite: LaunchableApp? = null
         composeRule.setContent {
             LauncherTheme(preference = ThemePreference.LIGHT) {
-                AppDrawerScreen(
+                HomeSearchScreen(
                     apps = listOf(app),
                     listState = rememberLazyListState(),
                     autoOpenKeyboard = false,

@@ -21,7 +21,7 @@ class InlineAssistantTest {
     private fun show() {
         composeRule.setContent {
             HomeScreen(favoriteApps = listOf(LaunchableApp("camera", "Activity", "Camera", Process.myUserHandle(), false)),
-                showDate = true, doubleTapToLock = false, onOpenNotifications = {}, onOpenSettings = {},
+                showDate = true, doubleTapToLock = false, onOpenSearch = {}, onOpenSettings = {},
                 onSetDefaultLauncher = {}, onLaunchApp = {}, onMoveFavorite = { _, _ -> }, onRemoveFavorite = {},
                 assistantContent = { expansion ->
                     HomeAssistant(apps = emptyList(), deviceSearch = null, onLaunchApp = {},

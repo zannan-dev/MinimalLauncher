@@ -5,7 +5,6 @@ import com.example.minimallauncher.domain.DeviceSearchResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import android.widget.Toast
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
@@ -15,6 +14,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.example.minimallauncher.ui.motion.LauncherMotion
 import com.example.minimallauncher.ui.motion.launcherPressFeedback
 import androidx.compose.foundation.gestures.stopScroll
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,6 +22,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imeAnimationSource
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Row
@@ -61,10 +68,12 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
@@ -91,11 +100,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import com.example.minimallauncher.domain.LaunchableApp
 import com.example.minimallauncher.domain.filterApps
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun AppDrawerScreen(
+fun HomeSearchScreen(
     apps: List<LaunchableApp>,
     listState: LazyListState,
     autoOpenKeyboard: Boolean,
@@ -106,15 +118,25 @@ fun AppDrawerScreen(
     onLaunchApp: (LaunchableApp) -> Unit,
     onToggleFavorite: (LaunchableApp) -> Unit,
     isActive: Boolean = true,
-    isPageMoving: Boolean = false,
     homeRequest: Long = 0L,
     deviceSearch: DeviceSearchRepository? = null,
     contactsAllowed: Boolean = false,
     contactsRevision: Int = 0,
     onRequestContacts: () -> Unit = {},
+    animateFromAssistant: Boolean = false,
+    homeSearchProgress: Float = 1f,
+    showAllApps: Boolean = true,
+    onShowAllApps: () -> Unit = {},
+    focusOnOpen: Boolean = autoOpenKeyboard,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    val filteredApps = remember(apps, query) { filterApps(apps, query) }
+    val filteredApps = remember(apps, query, animateFromAssistant, showAllApps) {
+        if (animateFromAssistant && query.isBlank() && !showAllApps) emptyList() else filterApps(apps, query)
+    }
+    LaunchedEffect(showAllApps) {
+        if (showAllApps) listState.scrollToItem(0)
+    }
+    val homeMorph = homeSearchProgress.coerceIn(0f, 1f)
     val context = LocalContext.current
     val settingsResults = remember(deviceSearch, query) { deviceSearch?.settings(query).orEmpty() }
     var contactQuery by remember { mutableStateOf("") }
@@ -170,7 +192,7 @@ fun AppDrawerScreen(
     var resumeSearchOnReturn by rememberSaveable { mutableStateOf(false) }
     var leftForSearchResult by rememberSaveable { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
-    val drawerActive by rememberUpdatedState(isActive)
+    val searchActive by rememberUpdatedState(isActive)
     val latestHomeRequest by rememberUpdatedState(homeRequest)
     var launchHomeRequest by rememberSaveable { mutableStateOf(homeRequest) }
     val windowFocused = LocalWindowInfo.current.isWindowFocused
@@ -217,7 +239,7 @@ fun AppDrawerScreen(
                     if (resumeSearchOnReturn && leftForSearchResult) {
                         resumeSearchOnReturn = false
                         leftForSearchResult = false
-                        if (drawerActive && query.isNotBlank() && launchHomeRequest == latestHomeRequest) {
+                        if (searchActive && query.isNotBlank() && launchHomeRequest == latestHomeRequest) {
                             focusOnEntry = true
                         }
                     }
@@ -239,33 +261,32 @@ fun AppDrawerScreen(
         }
     }
 
-    // A completed drawer entry is independent of insets, filtering, and list movement.
-    LaunchedEffect(isActive, autoOpenKeyboard) {
+    // A completed search entry is independent of insets, filtering, and list movement.
+    LaunchedEffect(isActive, focusOnOpen) {
         focusOnReturnToTop = false
-        focusOnEntry = isActive && autoOpenKeyboard
+        focusOnEntry = isActive && focusOnOpen
         if (!isActive) {
             resumeSearchOnReturn = false
             leftForSearchResult = false
             dismissSearch()
         }
     }
-    LaunchedEffect(focusOnEntry, isPageMoving, windowFocused, isActive) {
-        if (focusOnEntry && isActive && !isPageMoving && windowFocused) {
+    LaunchedEffect(focusOnEntry, windowFocused, isActive) {
+        if (focusOnEntry && isActive && windowFocused) {
             listState.stopScroll()
             focusOnEntry = false
             focusRequester.requestFocus()
             keyboardController?.show()
         }
     }
-    LaunchedEffect(isPageMoving) {
-        if (isPageMoving) dismissSearch()
-    }
 
     // Only a user gesture can dismiss search or arm automatic focus at the top.
     // Filtering, IME resizing, and restoring scroll position are not gestures.
-    val searchScrollConnection = remember(listState, isActive, autoOpenKeyboard) {
+    val searchScrollConnection = remember(listState, isActive, autoOpenKeyboard, animateFromAssistant, query.isBlank(), showAllApps) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // Empty Home search has no content to browse; keep its keyboard steady.
+                if (animateFromAssistant && query.isBlank() && !showAllApps) return Offset.Zero
                 if (isActive && source == NestedScrollSource.UserInput && available.y != 0f) {
                     if (searchFocused) {
                         focusManager.clearFocus()
@@ -282,36 +303,43 @@ fun AppDrawerScreen(
     LaunchedEffect(isActive, autoOpenKeyboard, focusOnReturnToTop, isAtTop,
         listState.isScrollInProgress, isListDragged) {
         if (isActive && autoOpenKeyboard && focusOnReturnToTop && isAtTop &&
-            !listState.isScrollInProgress && !isListDragged && !isPageMoving) {
+            !listState.isScrollInProgress && !isListDragged) {
             focusOnReturnToTop = false
             focusRequester.requestFocus()
             keyboardController?.show()
         }
     }
-    val searchInset by animateDpAsState(
-        targetValue = if (searchFocused) 16.dp else 32.dp,
-        animationSpec = LauncherMotion.settle(),
-        label = "Search pill width",
-    )
-    val searchHeight by animateDpAsState(
-        targetValue = if (searchFocused) 60.dp else 56.dp,
-        animationSpec = LauncherMotion.settle(),
-        label = "Search pill height",
-    )
+    // Use the system's animated inset so geometry and vertical travel share one clock.
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val imeExtent = maxOf(imeBottom, WindowInsets.imeAnimationSource.getBottom(density),
+        WindowInsets.imeAnimationTarget.getBottom(density))
+    val keyboardProgress = if (imeExtent > 0) (imeBottom.toFloat() / imeExtent).coerceIn(0f, 1f) else 0f
+    val searchInset = if (animateFromAssistant) 16.dp else 32.dp - 16.dp * keyboardProgress
+    val searchHeight = if (animateFromAssistant) 60.dp else 56.dp + 4.dp * keyboardProgress
     // An opaque, theme-derived fill keeps text underneath from showing through the pill.
     val searchFill = lerp(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surfaceVariant, 0.65f)
-    Box(modifier = Modifier.fillMaxSize().imePadding()) {
+    val closeHomeSearch by rememberUpdatedState(onBack)
+    BoxWithConstraints(modifier = Modifier.fillMaxSize().imePadding()
+        .background(MaterialTheme.colorScheme.surface.copy(alpha = if (animateFromAssistant) homeMorph else 1f))
+        .then(if (animateFromAssistant) Modifier.testTag("Home search view") else Modifier)
+        .pointerInput(animateFromAssistant, query, showAllApps) {
+            if (isActive && animateFromAssistant && query.isBlank() && !showAllApps) {
+                detectTapGestures(onTap = { dismissSearch(); closeHomeSearch() })
+            }
+        }) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize().nestedScroll(searchScrollConnection),
+            modifier = Modifier.fillMaxSize().nestedScroll(searchScrollConnection)
+                .graphicsLayer { alpha = if (animateFromAssistant) homeMorph else 1f },
             // Rows can pass beneath the floating controls; the last row can still scroll clear.
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 108.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = if (animateFromAssistant) 164.dp else 108.dp),
         ) {
             if (deviceSearch != null && query.isNotBlank() && filteredApps.isNotEmpty()) {
                 item(key = "section:apps") { SearchSectionLabel("Apps", Modifier.animateItem(fadeInSpec = LauncherMotion.fade(), placementSpec = LauncherMotion.settle(), fadeOutSpec = LauncherMotion.fade())) }
             }
             items(filteredApps, key = { app -> "app:${app.key}" }) { app ->
-                AppDrawerRow(
+                AppResultRow(
                     app = app,
                     isFavorite = app.key in favoriteKeys,
                     showOptions = optionsAppKey == app.key,
@@ -361,7 +389,8 @@ fun AppDrawerScreen(
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         }
         AnimatedVisibility(
-            visible = (showNoResults && noResults && !(isLoading && apps.isEmpty())) || (failedToLoad && apps.isEmpty()),
+            visible = (!animateFromAssistant || showAllApps || query.isNotBlank()) &&
+                ((showNoResults && noResults && !(isLoading && apps.isEmpty())) || (failedToLoad && apps.isEmpty())),
             enter = fadeIn(LauncherMotion.fade()), exit = fadeOut(LauncherMotion.fade()),
         ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -373,14 +402,34 @@ fun AppDrawerScreen(
             }
         }
         Box(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(140.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(if (animateFromAssistant) 188.dp else 140.dp)
                 .background(Brush.verticalGradient(
                     0f to Color.Transparent,
                     0.45f to Color.Black.copy(alpha = 0.12f),
                     1f to Color.Black.copy(alpha = 0.5f),
                 )),
         )
+        if (animateFromAssistant) {
+            AnimatedVisibility(
+                visible = !showAllApps && query.isEmpty(),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 104.dp)
+                    .graphicsLayer { alpha = homeMorph },
+                enter = fadeIn(LauncherMotion.fade()),
+                exit = fadeOut(LauncherMotion.fade()),
+            ) {
+                TextButton(
+                    enabled = isActive && !showAllApps && query.isEmpty(),
+                    onClick = {
+                        query = ""
+                        listState.requestScrollToItem(0)
+                        dismissSearch()
+                        onShowAllApps()
+                    },
+                ) { Text("All apps", color = MaterialTheme.colorScheme.onSurface) }
+            }
+        }
         TextField(
+            enabled = isActive,
             value = query,
             onValueChange = {
                 focusOnReturnToTop = false
@@ -393,10 +442,20 @@ fun AppDrawerScreen(
             textStyle = MaterialTheme.typography.titleMedium,
             shape = RoundedCornerShape(percent = 50),
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = if (animateFromAssistant) {
+                { IconButton(onClick = { dismissSearch(); onBack() }) {
+                    Icon(Icons.Default.Close, contentDescription = "Close home search")
+                } }
+            } else null,
             placeholder = { Text(if (deviceSearch == null) "Search apps..." else "Search…", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = searchFill,
                 unfocusedContainerColor = searchFill,
+                disabledContainerColor = searchFill,
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                 unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                 disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
@@ -416,8 +475,13 @@ fun AppDrawerScreen(
                     }
                 }
             ),
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                .padding(horizontal = searchInset, vertical = 16.dp).height(searchHeight)
+            modifier = Modifier.align(Alignment.BottomCenter)
+                .testTag(if (animateFromAssistant) "Home search" else "App search")
+                .width(if (animateFromAssistant) 96.dp + (maxWidth - searchInset * 2 - 96.dp) * homeMorph
+                    else maxWidth - searchInset * 2)
+                .padding(vertical = 16.dp)
+                .height(if (animateFromAssistant) 96.dp + (searchHeight - 96.dp) * homeMorph else searchHeight)
+                .graphicsLayer { alpha = if (animateFromAssistant) homeMorph else 1f }
                 .onFocusChanged {
                     searchFocused = it.isFocused
                     if (it.isFocused) focusOnReturnToTop = false
@@ -429,7 +493,7 @@ fun AppDrawerScreen(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AppDrawerRow(
+private fun AppResultRow(
     app: LaunchableApp,
     isFavorite: Boolean,
     showOptions: Boolean,
