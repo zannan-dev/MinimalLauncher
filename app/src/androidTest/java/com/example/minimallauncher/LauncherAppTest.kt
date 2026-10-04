@@ -25,6 +25,7 @@ import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollToIndex
@@ -364,7 +365,76 @@ class LauncherAppTest {
     }
 
     @Test
-    fun homeSearchFinishesShrinkingBeforeItsViewIsRemoved() {
+    fun searchCanReopenImmediatelyWithoutLosingItsPositionOrFocus() {
+        val viewModel = LauncherViewModel(TestApplicationsRepository(), TestPreferencesRepository())
+        composeRule.setContent {
+            LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
+        }
+        val ring = composeRule.onNodeWithContentDescription("Voice assistant")
+        val restingCenter = ring.fetchSemanticsNode().boundsInRoot.center
+        var searchCenter: Offset? = null
+        repeat(4) {
+            composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+            val pill = composeRule.onNodeWithTag("Home search")
+            pill.assertIsFocused()
+            composeRule.waitUntil(5_000) {
+                ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
+                    ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+            }
+            val center = pill.fetchSemanticsNode().boundsInRoot.center
+            searchCenter?.let {
+                assertEquals("Repeated entry must keep the pill's position", it.y, center.y, 2f)
+            }
+            searchCenter = center
+            composeRule.onNodeWithContentDescription("Close home search").performClick()
+            pill.assertDoesNotExist()
+            ring.assertIsDisplayed()
+            assertEquals(restingCenter.y, ring.fetchSemanticsNode().boundsInRoot.center.y, 1f)
+            // Reopen as soon as the return finishes, with no settling delay.
+        }
+    }
+
+    @Test
+    fun interruptingSearchOpeningNeverReboundsDuringClosing() {
+        val viewModel = LauncherViewModel(TestApplicationsRepository(), TestPreferencesRepository())
+        composeRule.setContent {
+            LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
+        }
+        // Learn the real keyboard position, then reopen without a settling delay.
+        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+        composeRule.waitUntil(5_000) {
+            ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
+                ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+        }
+        val keyboardSettlesAt = SystemClock.uptimeMillis() + 400
+        composeRule.waitUntil(2_000) { SystemClock.uptimeMillis() >= keyboardSettlesAt }
+        composeRule.onNodeWithContentDescription("Close home search").performClick()
+        composeRule.onNodeWithTag("Home search").assertDoesNotExist()
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+            composeRule.mainClock.advanceTimeBy(96)
+            val pill = composeRule.onNodeWithTag("Home search")
+            val initial = pill.fetchSemanticsNode().boundsInRoot
+            composeRule.onNodeWithContentDescription("Close home search").performClick()
+            var previousWidth = pill.fetchSemanticsNode().boundsInRoot.width
+            repeat(8) {
+                composeRule.mainClock.advanceTimeBy(32)
+                val frame = composeRule.onAllNodesWithTag("Home search").fetchSemanticsNodes().firstOrNull()
+                if (frame != null) {
+                    val bounds = frame.boundsInRoot
+                    assertTrue("Interrupted closing must never grow again: $previousWidth -> ${bounds.width}", bounds.width <= previousWidth + 0.5f)
+                    assertEquals("Keyboard reversal must not move the field", initial.center.y, bounds.center.y, 2f)
+                    previousWidth = bounds.width
+                }
+            }
+            composeRule.mainClock.advanceTimeBy(1_000)
+            pill.assertDoesNotExist()
+        } finally { composeRule.mainClock.autoAdvance = true }
+    }
+
+    @Test
+    fun homeSearchClosesInPlaceBeforeItsViewIsRemoved() {
         val viewModel = LauncherViewModel(
             applicationsRepository = TestApplicationsRepository(),
             preferencesRepository = TestPreferencesRepository(),
@@ -372,23 +442,33 @@ class LauncherAppTest {
         composeRule.setContent {
             LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
         }
-        // Keep native IME animation outside the paused Compose clock check.
         composeRule.onNodeWithText("All apps").assertDoesNotExist()
         composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
-        composeRule.onNodeWithText("All apps").performClick()
         composeRule.waitUntil(5_000) {
             ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
-                ?.isVisible(WindowInsetsCompat.Type.ime()) != true
+                ?.isVisible(WindowInsetsCompat.Type.ime()) == true
         }
+        val settleUntil = SystemClock.uptimeMillis() + 500
+        composeRule.waitUntil(2_000) { SystemClock.uptimeMillis() >= settleUntil }
         val pill = composeRule.onNodeWithTag("Home search")
-        pill.assertIsNotFocused()
-        val expandedWidth = pill.fetchSemanticsNode().size.width
+        pill.assertIsFocused()
+        val expandedBounds = pill.fetchSemanticsNode().boundsInRoot
+        val closeIcon = composeRule.onNodeWithContentDescription("Close home search")
+        val expandedCloseX = closeIcon.fetchSemanticsNode().boundsInRoot.center.x
         composeRule.mainClock.autoAdvance = false
         try {
             composeRule.onNodeWithContentDescription("Close home search").performClick()
-            composeRule.mainClock.advanceTimeBy(180)
-            val closingWidth = pill.fetchSemanticsNode().size.width
-            assertTrue("Pill must remain while shrinking", closingWidth in 1 until expandedWidth)
+            composeRule.mainClock.advanceTimeBy(130)
+            val closingBounds = pill.fetchSemanticsNode().boundsInRoot
+            val widthRatio = closingBounds.width / expandedBounds.width
+            val heightRatio = closingBounds.height / expandedBounds.height
+            assertTrue("The entire field must visibly shrink", widthRatio in 0.7f..0.9f)
+            assertEquals("Width and height must scale together", widthRatio, heightRatio, 0.01f)
+            assertEquals("Closing must stay at the search position", expandedBounds.center.y, closingBounds.center.y, 1f)
+            assertEquals(expandedBounds.center.x, closingBounds.center.x, 1f)
+            val closingCloseX = closeIcon.fetchSemanticsNode().boundsInRoot.center.x
+            assertEquals("The icon must scale with the entire field",
+                widthRatio, (closingCloseX - closingBounds.center.x) / (expandedCloseX - expandedBounds.center.x), 0.02f)
             composeRule.mainClock.advanceTimeBy(1_000)
             pill.assertDoesNotExist()
             composeRule.onNodeWithContentDescription("Voice assistant").assertIsDisplayed()

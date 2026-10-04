@@ -64,11 +64,12 @@ fun HomeScreen(
     onOpenNotifications: () -> Unit = {},
     assistantExpansion: androidx.compose.runtime.MutableState<Boolean>? = null,
     searchVisible: Boolean = false,
+    searchProgress: Float = if (searchVisible) 1f else 0f,
     gesturesEnabled: Boolean = true,
     assistantContent: @Composable (androidx.compose.runtime.MutableState<Boolean>) -> Unit = {},
 ) {
     val assistantExpanded = assistantExpansion ?: remember { mutableStateOf(false) }
-    val favoriteAlpha by animateFloatAsState(if (assistantExpanded.value || searchVisible) 0f else 1f,
+    val favoriteAlpha by animateFloatAsState(if (assistantExpanded.value) 0f else 1f,
         LauncherMotion.fade(), label = "Home favourites presence")
     var draggingFavorite by remember { mutableStateOf(false) }
     var now by remember { mutableStateOf(LocalDateTime.now()) }
@@ -181,12 +182,11 @@ fun HomeScreen(
             .padding(horizontal = 24.dp),
     ) {
         val headerAlpha by animateFloatAsState(when {
-            searchVisible -> 0f
             assistantExpanded.value -> 0.45f
             else -> 1f
         }, LauncherMotion.fade(), label = "Home context presence")
         Column(
-            modifier = Modifier.align(Alignment.TopStart).padding(top = 8.dp).graphicsLayer { alpha = headerAlpha }
+            modifier = Modifier.align(Alignment.TopStart).padding(top = 8.dp).graphicsLayer { alpha = headerAlpha * (1f - LauncherMotion.reveal(searchProgress)) }
                 .then(if (searchVisible) Modifier.clearAndSetSemantics {} else Modifier),
             horizontalAlignment = Alignment.Start,
         ) {
@@ -233,13 +233,17 @@ fun HomeScreen(
             enabled = !assistantExpanded.value && !searchVisible,
             modifier = Modifier.fillMaxSize().padding(top = maxHeight * 0.44f)
                 .zIndex(if (draggingFavorite) 2f else 0f)
-                .graphicsLayer { alpha = favoriteAlpha }
+                .graphicsLayer { alpha = favoriteAlpha * (1f - LauncherMotion.reveal(searchProgress)) }
                 .then(if (assistantExpanded.value || searchVisible) Modifier.clearAndSetSemantics {} else Modifier),
         )
         AnimatedVisibility(
-            visible = !draggingFavorite && !searchVisible,
+            visible = !draggingFavorite,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)
-                .heightIn(max = (maxHeight - 144.dp).coerceAtLeast(0.dp)),
+                .heightIn(max = (maxHeight - 144.dp).coerceAtLeast(0.dp))
+                .graphicsLayer {
+                    alpha = 1f - LauncherMotion.reveal(searchProgress)
+                }
+                .then(if (searchVisible) Modifier.clearAndSetSemantics {} else Modifier),
             enter = fadeIn(LauncherMotion.fade()) + scaleIn(LauncherMotion.settle(), initialScale = 0.88f),
             exit = fadeOut(LauncherMotion.fade()) + scaleOut(LauncherMotion.settle(), targetScale = 0.8f),
         ) { assistantContent(assistantExpanded) }

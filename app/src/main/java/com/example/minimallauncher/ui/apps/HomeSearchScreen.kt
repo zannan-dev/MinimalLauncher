@@ -5,6 +5,7 @@ import com.example.minimallauncher.domain.DeviceSearchResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import android.widget.Toast
+import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
@@ -30,6 +31,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imeAnimationSource
 import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +52,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberUpdatedState
@@ -100,6 +103,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import com.example.minimallauncher.domain.LaunchableApp
@@ -123,20 +127,22 @@ fun HomeSearchScreen(
     contactsAllowed: Boolean = false,
     contactsRevision: Int = 0,
     onRequestContacts: () -> Unit = {},
-    animateFromAssistant: Boolean = false,
+    animateFromHome: Boolean = false,
     homeSearchProgress: Float = 1f,
     showAllApps: Boolean = true,
     onShowAllApps: () -> Unit = {},
     focusOnOpen: Boolean = autoOpenKeyboard,
+    previousKeyboardBottom: Int = 0,
+    onKeyboardPosition: (Int) -> Unit = {},
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    val filteredApps = remember(apps, query, animateFromAssistant, showAllApps) {
-        if (animateFromAssistant && query.isBlank() && !showAllApps) emptyList() else filterApps(apps, query)
+    val filteredApps = remember(apps, query, animateFromHome, showAllApps) {
+        if (animateFromHome && query.isBlank() && !showAllApps) emptyList() else filterApps(apps, query)
     }
     LaunchedEffect(showAllApps) {
         if (showAllApps) listState.scrollToItem(0)
     }
-    val homeMorph = homeSearchProgress.coerceIn(0f, 1f)
+    val homePresence = homeSearchProgress.coerceIn(0f, 1f)
     val context = LocalContext.current
     val settingsResults = remember(deviceSearch, query) { deviceSearch?.settings(query).orEmpty() }
     var contactQuery by remember { mutableStateOf("") }
@@ -282,11 +288,11 @@ fun HomeSearchScreen(
 
     // Only a user gesture can dismiss search or arm automatic focus at the top.
     // Filtering, IME resizing, and restoring scroll position are not gestures.
-    val searchScrollConnection = remember(listState, isActive, autoOpenKeyboard, animateFromAssistant, query.isBlank(), showAllApps) {
+    val searchScrollConnection = remember(listState, isActive, autoOpenKeyboard, animateFromHome, query.isBlank(), showAllApps) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 // Empty Home search has no content to browse; keep its keyboard steady.
-                if (animateFromAssistant && query.isBlank() && !showAllApps) return Offset.Zero
+                if (animateFromHome && query.isBlank() && !showAllApps) return Offset.Zero
                 if (isActive && source == NestedScrollSource.UserInput && available.y != 0f) {
                     if (searchFocused) {
                         focusManager.clearFocus()
@@ -309,31 +315,72 @@ fun HomeSearchScreen(
             keyboardController?.show()
         }
     }
-    // Use the system's animated inset so geometry and vertical travel share one clock.
     val density = LocalDensity.current
     val imeBottom = WindowInsets.ime.getBottom(density)
-    val imeExtent = maxOf(imeBottom, WindowInsets.imeAnimationSource.getBottom(density),
-        WindowInsets.imeAnimationTarget.getBottom(density))
+    val imeTargetBottom = WindowInsets.imeAnimationTarget.getBottom(density)
+    val imeExtent = maxOf(imeBottom, WindowInsets.imeAnimationSource.getBottom(density), imeTargetBottom)
     val keyboardProgress = if (imeExtent > 0) (imeBottom.toFloat() / imeExtent).coerceIn(0f, 1f) else 0f
-    val searchInset = if (animateFromAssistant) 16.dp else 32.dp - 16.dp * keyboardProgress
-    val searchHeight = if (animateFromAssistant) 60.dp else 56.dp + 4.dp * keyboardProgress
+    val hardwareKeyboard = LocalConfiguration.current.keyboard != Configuration.KEYBOARD_NOKEYS
+    var entryPositionSettled by remember { mutableStateOf(!focusOnOpen || hardwareKeyboard) }
+    var entryBottom by remember { mutableStateOf(previousKeyboardBottom) }
+    LaunchedEffect(imeBottom, imeTargetBottom, homePresence, isActive) {
+        if (entryBottom == 0 && imeTargetBottom > 0) entryBottom = imeTargetBottom
+        // An old keyboard animation can briefly report settled insets on reentry.
+        // Keep the entry anchor until both the new reveal and the keyboard finish.
+        if (isActive && homePresence == 1f && imeBottom > 0 && imeBottom == imeTargetBottom) {
+            entryPositionSettled = true
+        }
+    }
+    // Reuse one keyboard destination throughout entry, even during a fast reversal.
+    val openingAtKeyboard = animateFromHome && !entryPositionSettled && focusOnOpen && !hardwareKeyboard
+    val activeBottom = if (openingAtKeyboard) entryBottom else imeBottom
+    val contentPresence = if (animateFromHome) {
+        if (openingAtKeyboard && entryBottom == 0) 0f else homePresence
+    } else 1f
+    var lastActivePresence by remember { mutableStateOf(0f) }
+    val closingFraction = if (lastActivePresence > 0f) (contentPresence / lastActivePresence).coerceIn(0f, 1f) else 0f
+    val surfacePresence = if (!animateFromHome) 1f else if (isActive) {
+        LauncherMotion.reveal(contentPresence, 0f, 0.4f)
+    } else LauncherMotion.reveal(lastActivePresence, 0f, 0.4f) * LauncherMotion.reveal(closingFraction, 0f, 0.2f)
+    val revealPresence = if (isActive) contentPresence else lastActivePresence
+    val searchDetailsPresence = if (animateFromHome) {
+        LauncherMotion.reveal(revealPresence, 0.35f, 0.85f) *
+            if (isActive) 1f else LauncherMotion.reveal(closingFraction, 0.35f, 0.85f)
+    } else 1f
+    var lastActiveBottom by remember { mutableStateOf(0) }
+    SideEffect {
+        if (isActive) {
+            lastActiveBottom = activeBottom
+            lastActivePresence = contentPresence
+        }
+        if (isActive && imeBottom > 0 && imeBottom == imeTargetBottom) onKeyboardPosition(imeBottom)
+    }
+    val keyboardPadding = if (animateFromHome) {
+        Modifier.windowInsetsPadding(WindowInsets(bottom = if (isActive) activeBottom else lastActiveBottom))
+    } else Modifier.imePadding()
+    val searchInset = if (animateFromHome) 16.dp else 32.dp - 16.dp * keyboardProgress
+    val searchHeight = if (animateFromHome) 60.dp else 56.dp + 4.dp * keyboardProgress
     // An opaque, theme-derived fill keeps text underneath from showing through the pill.
-    val searchFill = lerp(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surfaceVariant, 0.65f)
+    val openingFillIntensity = 0.45f + 0.55f * LauncherMotion.reveal(revealPresence, 0f, 0.9f)
+    val fillIntensity = if (animateFromHome) {
+        openingFillIntensity * if (isActive) 1f else 0.45f + 0.55f * closingFraction
+    } else 1f
+    val searchFill = lerp(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surfaceVariant, 0.65f * fillIntensity)
     val closeHomeSearch by rememberUpdatedState(onBack)
-    BoxWithConstraints(modifier = Modifier.fillMaxSize().imePadding()
-        .background(MaterialTheme.colorScheme.surface.copy(alpha = if (animateFromAssistant) homeMorph else 1f))
-        .then(if (animateFromAssistant) Modifier.testTag("Home search view") else Modifier)
-        .pointerInput(animateFromAssistant, query, showAllApps) {
-            if (isActive && animateFromAssistant && query.isBlank() && !showAllApps) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize().then(keyboardPadding)
+        .background(MaterialTheme.colorScheme.surface.copy(alpha = if (animateFromHome) LauncherMotion.reveal(homePresence) else 1f))
+        .then(if (animateFromHome) Modifier.testTag("Home search view") else Modifier)
+        .pointerInput(animateFromHome, query, showAllApps) {
+            if (isActive && animateFromHome && query.isBlank() && !showAllApps) {
                 detectTapGestures(onTap = { dismissSearch(); closeHomeSearch() })
             }
         }) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().nestedScroll(searchScrollConnection)
-                .graphicsLayer { alpha = if (animateFromAssistant) homeMorph else 1f },
+                .graphicsLayer { alpha = contentPresence },
             // Rows can pass beneath the floating controls; the last row can still scroll clear.
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = if (animateFromAssistant) 164.dp else 108.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = if (animateFromHome) 164.dp else 108.dp),
         ) {
             if (deviceSearch != null && query.isNotBlank() && filteredApps.isNotEmpty()) {
                 item(key = "section:apps") { SearchSectionLabel("Apps", Modifier.animateItem(fadeInSpec = LauncherMotion.fade(), placementSpec = LauncherMotion.settle(), fadeOutSpec = LauncherMotion.fade())) }
@@ -389,7 +436,7 @@ fun HomeSearchScreen(
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         }
         AnimatedVisibility(
-            visible = (!animateFromAssistant || showAllApps || query.isNotBlank()) &&
+            visible = (!animateFromHome || showAllApps || query.isNotBlank()) &&
                 ((showNoResults && noResults && !(isLoading && apps.isEmpty())) || (failedToLoad && apps.isEmpty())),
             enter = fadeIn(LauncherMotion.fade()), exit = fadeOut(LauncherMotion.fade()),
         ) {
@@ -402,18 +449,19 @@ fun HomeSearchScreen(
             }
         }
         Box(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(if (animateFromAssistant) 188.dp else 140.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(if (animateFromHome) 188.dp else 140.dp)
+                .graphicsLayer { alpha = if (animateFromHome) LauncherMotion.reveal(homePresence) else 1f }
                 .background(Brush.verticalGradient(
                     0f to Color.Transparent,
                     0.45f to Color.Black.copy(alpha = 0.12f),
                     1f to Color.Black.copy(alpha = 0.5f),
                 )),
         )
-        if (animateFromAssistant) {
+        if (animateFromHome) {
             AnimatedVisibility(
                 visible = !showAllApps && query.isEmpty(),
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 104.dp)
-                    .graphicsLayer { alpha = homeMorph },
+                    .graphicsLayer { alpha = searchDetailsPresence },
                 enter = fadeIn(LauncherMotion.fade()),
                 exit = fadeOut(LauncherMotion.fade()),
             ) {
@@ -439,11 +487,11 @@ fun HomeSearchScreen(
                 listState.requestScrollToItem(0)
             },
             singleLine = true,
-            textStyle = MaterialTheme.typography.titleMedium,
+            textStyle = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface),
             shape = RoundedCornerShape(percent = 50),
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            trailingIcon = if (animateFromAssistant) {
-                { IconButton(onClick = { dismissSearch(); onBack() }) {
+            trailingIcon = if (animateFromHome) {
+                { IconButton(enabled = isActive, onClick = { dismissSearch(); onBack() }) {
                     Icon(Icons.Default.Close, contentDescription = "Close home search")
                 } }
             } else null,
@@ -476,12 +524,17 @@ fun HomeSearchScreen(
                 }
             ),
             modifier = Modifier.align(Alignment.BottomCenter)
-                .testTag(if (animateFromAssistant) "Home search" else "App search")
-                .width(if (animateFromAssistant) 96.dp + (maxWidth - searchInset * 2 - 96.dp) * homeMorph
-                    else maxWidth - searchInset * 2)
+                .width(maxWidth - searchInset * 2)
                 .padding(vertical = 16.dp)
-                .height(if (animateFromAssistant) 96.dp + (searchHeight - 96.dp) * homeMorph else searchHeight)
-                .graphicsLayer { alpha = if (animateFromAssistant) homeMorph else 1f }
+                .height(searchHeight)
+                .graphicsLayer {
+                    // Scale the entire field as one object: fill, text, and both icons.
+                    alpha = surfacePresence
+                    val fieldScale = if (animateFromHome) 0.7f + 0.3f * contentPresence else 1f
+                    scaleX = fieldScale
+                    scaleY = fieldScale
+                }
+                .testTag(if (animateFromHome) "Home search" else "App search")
                 .onFocusChanged {
                     searchFocused = it.isFocused
                     if (it.isFocused) focusOnReturnToTop = false

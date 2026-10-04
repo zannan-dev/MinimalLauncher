@@ -1,15 +1,16 @@
 package com.example.minimallauncher.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.EnterExitState
-import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.key
 import android.Manifest
 import android.content.Intent
@@ -111,14 +112,32 @@ fun LauncherApp(
     val currentScreen = LauncherScreen.valueOf(currentScreenName)
     val assistantExpansion = remember { mutableStateOf(false) }
     var homeSearchVisible by remember { mutableStateOf(false) }
+    val searchAnimation = remember { Animatable(0f) }
+    val searchScope = rememberCoroutineScope()
+    var searchJob by remember { mutableStateOf<Job?>(null) }
+    val setSearchVisible: (Boolean) -> Unit = { visible ->
+        homeSearchVisible = visible
+        // Cancel at the gesture/click itself so another opening frame cannot slip
+        // through before a composition effect processes the reversed target.
+        searchJob?.cancel()
+        searchJob = searchScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            val destination = if (visible) 1f else 0f
+            if (searchAnimation.value != destination) {
+                searchAnimation.animateTo(destination, LauncherMotion.search(opening = visible), initialVelocity = 0f)
+            }
+        }
+    }
+    val searchProgress = searchAnimation.value
+    val searchPresent = homeSearchVisible || searchProgress > 0f || searchAnimation.isRunning
     var homeAllApps by remember { mutableStateOf(false) }
     var searchSession by remember { mutableStateOf(0) }
+    var searchKeyboardBottom by remember(androidx.compose.ui.platform.LocalConfiguration.current) { mutableStateOf(0) }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     var appPendingLaunch by remember { mutableStateOf<LaunchableApp?>(null) }
     var lastPendingApp by remember { mutableStateOf<LaunchableApp?>(null) }
     val openHome: () -> Unit = {
-        homeSearchVisible = false
+        setSearchVisible(false)
         appPendingLaunch = null
         currentScreenName = LauncherScreen.HOME.name
     }
@@ -134,7 +153,7 @@ fun LauncherApp(
 
     LaunchedEffect(homeRequest) {
         if (returningHome) {
-            homeSearchVisible = false
+            setSearchVisible(false)
             appPendingLaunch = null
             currentScreenName = LauncherScreen.HOME.name
             focusManager.clearFocus(force = true)
@@ -147,7 +166,7 @@ fun LauncherApp(
 
     BackHandler(enabled = appPendingLaunch != null, onBack = openHome)
     BackHandler(enabled = homeSearchVisible && appPendingLaunch == null) {
-        homeSearchVisible = false
+        setSearchVisible(false)
         focusManager.clearFocus(force = true)
         keyboardController?.hide()
     }
@@ -201,7 +220,7 @@ fun LauncherApp(
                                 favoriteApps = state.favoriteApps,
                                 showDate = state.preferences.showDate,
                                 doubleTapToLock = state.preferences.doubleTapToLock,
-                                onOpenSearch = { searchSession++; homeAllApps = false; homeSearchVisible = true },
+                                onOpenSearch = { searchSession++; homeAllApps = false; setSearchVisible(true) },
                                 onOpenNotifications = onOpenNotifications,
                                 onOpenSettings = { currentScreenName = LauncherScreen.SETTINGS.name },
                                 onSetDefaultLauncher = onOpenDefaultLauncherSettings,
@@ -209,39 +228,37 @@ fun LauncherApp(
                                 onMoveFavorite = viewModel::moveFavorite,
                                 onRemoveFavorite = viewModel::removeFavorite,
                                 assistantExpansion = assistantExpansion,
-                                searchVisible = homeSearchVisible,
+                                searchVisible = searchPresent,
+                                searchProgress = searchProgress,
                                 gesturesEnabled = !returningHome && appPendingLaunch == null,
                                 assistantContent = { expansionState ->
                                     com.example.minimallauncher.ui.assistant.HomeAssistant(
                                         apps = state.apps,
                                         deviceSearch = deviceSearch,
                                         onLaunchApp = handleAppLaunch,
-                                        isActive = !homeSearchVisible && !returningHome && currentScreen == LauncherScreen.HOME && appPendingLaunch == null,
+                                        isActive = !searchPresent && !returningHome && currentScreen == LauncherScreen.HOME && appPendingLaunch == null,
                                         homeRequest = homeRequest,
                                         expansionState = expansionState,
                                     )
                                 },
                             )
-                            AnimatedVisibility(visible = homeSearchVisible,
-                                enter = EnterTransition.None, exit = ExitTransition.None) {
-                                // Registered on this visibility transition: keep the pill alive
-                                // until its complete return to the ring has settled.
-                                val searchProgress by transition.animateFloat(
-                                    transitionSpec = { LauncherMotion.settle() }, label = "Assistant to search",
-                                ) { if (it == EnterExitState.Visible) 1f else 0f }
+                            // Retain the overlay until its closing transition completes.
+                            if (searchPresent) {
                                 key(searchSession) { HomeSearchScreen(
                                     apps = state.apps, listState = rememberLazyListState(),
                                     autoOpenKeyboard = !homeAllApps || state.preferences.autoOpenKeyboard,
                                     focusOnOpen = !homeAllApps, isLoading = state.isLoadingApps,
                                     failedToLoad = state.appLoadError, favoriteKeys = state.preferences.favoriteAppKeys,
-                                    onBack = { homeSearchVisible = false }, onLaunchApp = handleAppLaunch,
+                                    onBack = { setSearchVisible(false) }, onLaunchApp = handleAppLaunch,
                                     onToggleFavorite = viewModel::toggleFavorite,
                                     isActive = homeSearchVisible && !returningHome && appPendingLaunch == null,
                                     homeRequest = homeRequest, deviceSearch = deviceSearch,
                                     contactsAllowed = contactsAllowed, contactsRevision = contactsRevision,
-                                    onRequestContacts = requestContacts, animateFromAssistant = true,
+                                    onRequestContacts = requestContacts, animateFromHome = true,
                                     showAllApps = homeAllApps, onShowAllApps = { homeAllApps = true },
                                     homeSearchProgress = searchProgress,
+                                    previousKeyboardBottom = searchKeyboardBottom,
+                                    onKeyboardPosition = { searchKeyboardBottom = it },
                                 ) }
                             }
                         }
