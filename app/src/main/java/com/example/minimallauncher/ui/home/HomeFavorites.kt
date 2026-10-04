@@ -1,6 +1,7 @@
 package com.example.minimallauncher.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
@@ -13,6 +14,11 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import com.example.minimallauncher.ui.motion.LauncherMotion
 import com.example.minimallauncher.ui.motion.launcherPressFeedback
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -31,6 +37,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -64,6 +71,7 @@ fun HomeFavorites(
     onMoveFavorite: (LaunchableApp, LaunchableApp) -> Unit,
     onRemoveFavorite: (LaunchableApp) -> Unit,
     modifier: Modifier = Modifier,
+    onDragActiveChanged: (Boolean) -> Unit = {},
 ) {
     var draggingKey by remember { mutableStateOf<String?>(null) }
     var dragPosition by remember { mutableStateOf(Offset.Zero) }
@@ -80,24 +88,40 @@ fun HomeFavorites(
         if (draggingKey != null) 1.035f else 1f,
         LauncherMotion.settle(), label = "Favorite lift",
     )
+    val targetScale by animateFloatAsState(if (overTrash) 1.07f else 1f,
+        LauncherMotion.settle(), label = "Removal attraction")
+    val iconTilt by animateFloatAsState(if (overTrash) -10f else 0f,
+        LauncherMotion.settle(), label = "Removal tilt")
+    val targetBackground by animateColorAsState(if (overTrash) Color(0xFF321B1B) else Color(0xFF161616),
+        LauncherMotion.color(), label = "Removal surface")
     val trashColor by animateColorAsState(
-        if (overTrash) Color(0xFFFF7777) else Color.White,
+        if (overTrash) Color(0xFFFFB1B1) else Color.White,
         LauncherMotion.color(), label = "Removal target",
     )
     LaunchedEffect(overTrash) {
         if (overTrash) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
+    DisposableEffect(Unit) {
+        onDispose { onDragActiveChanged(false) }
+    }
     val appsByKey = apps.associateBy { it.key }
     val visibleApps = previewOrder?.mapNotNull(appsByKey::get) ?: apps
 
     LaunchedEffect(apps.map { it.key }) {
+        if (draggingKey != null && apps.none { it.key == draggingKey }) {
+            draggingKey = null
+            dragOrigin = null
+            dragOffset = Offset.Zero
+            previewOrder = null
+            onDragActiveChanged(false)
+        }
         if (draggingKey == null && previewOrder == apps.map { it.key }) previewOrder = null
     }
 
     Box(modifier = modifier.onGloballyPositioned { containerBounds = it.boundsInRoot() }) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize().padding(bottom = 72.dp),
+            modifier = Modifier.fillMaxSize().padding(bottom = 128.dp),
             userScrollEnabled = listState.canScrollForward || listState.canScrollBackward,
         ) {
             items(visibleApps, key = { it.key }) { app ->
@@ -120,6 +144,7 @@ fun HomeFavorites(
                                         val origin = rowBounds[app.key]
                                         dragOrigin = origin
                                         draggingKey = app.key
+                                        onDragActiveChanged(true)
                                         previewOrder = apps.map { it.key }
                                         dragOffset = Offset.Zero
                                         dragPosition = origin?.topLeft?.plus(start) ?: start
@@ -156,11 +181,13 @@ fun HomeFavorites(
                                             }
                                         }
                                         draggingKey = null
+                                        onDragActiveChanged(false)
                                         dragOrigin = null
                                         dragOffset = Offset.Zero
                                     },
                                     onDragCancel = {
                                         draggingKey = null
+                                        onDragActiveChanged(false)
                                         dragOrigin = null
                                         previewOrder = null
                                         dragOffset = Offset.Zero
@@ -177,30 +204,36 @@ fun HomeFavorites(
 
         AnimatedVisibility(
             visible = draggingKey != null,
-            modifier = Modifier.align(Alignment.BottomCenter).zIndex(1f),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp).zIndex(3f),
             enter = fadeIn(LauncherMotion.fade()) + scaleIn(LauncherMotion.settle(), initialScale = 0.85f),
             exit = fadeOut(LauncherMotion.fade()) + scaleOut(LauncherMotion.settle(), targetScale = 0.85f),
         ) {
-            Box(
-                modifier = Modifier.size(64.dp)
+            Row(
+                modifier = Modifier.width(196.dp).heightIn(min = 72.dp)
                     .onGloballyPositioned { trashBounds = it.boundsInRoot() }
+                    .graphicsLayer { scaleX = targetScale; scaleY = targetScale }
+                    .background(targetBackground, RoundedCornerShape(50))
+                    .border(1.dp, trashColor.copy(alpha = if (overTrash) 0.45f else 0.12f), RoundedCornerShape(50))
+                    .padding(horizontal = 20.dp)
                     .semantics { contentDescription = "Remove favorite" },
-                contentAlignment = Alignment.Center,
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
             ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = null,
-                    tint = trashColor,
-                    modifier = Modifier.size(28.dp),
-                )
+                Icon(Icons.Default.Delete, contentDescription = null, tint = trashColor,
+                    modifier = Modifier.size(24.dp).graphicsLayer { rotationZ = iconTilt })
+                Crossfade(targetState = overTrash, modifier = Modifier.weight(1f), animationSpec = LauncherMotion.fade(), label = "Removal instruction") { hovered ->
+                    Text(if (hovered) "Release to remove" else "Remove", modifier = Modifier.fillMaxWidth(),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center, fontSize = 13.sp, color = trashColor)
+                }
             }
         }
+
         val draggedApp = apps.firstOrNull { it.key == draggingKey }
         val origin = dragOrigin
         val container = containerBounds
         if (draggedApp != null && origin != null && container != null) {
             Row(
-                modifier = Modifier
+                modifier = Modifier.zIndex(2f)
                     .offset {
                         IntOffset(
                             (origin.left - container.left).roundToInt(),

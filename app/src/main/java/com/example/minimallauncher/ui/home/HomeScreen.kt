@@ -1,6 +1,9 @@
 package com.example.minimallauncher.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.ui.zIndex
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
@@ -56,6 +59,7 @@ fun HomeScreen(
     onRemoveFavorite: (LaunchableApp) -> Unit,
     assistantContent: @Composable () -> Unit = {},
 ) {
+    var draggingFavorite by remember { mutableStateOf(false) }
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     var isDefaultLauncher by remember { mutableStateOf(true) }
     val context = LocalContext.current
@@ -206,11 +210,16 @@ fun HomeScreen(
             onLaunchApp = onLaunchApp,
             onMoveFavorite = onMoveFavorite,
             onRemoveFavorite = onRemoveFavorite,
-            modifier = Modifier.fillMaxSize().padding(top = maxHeight * 0.44f),
+            onDragActiveChanged = { draggingFavorite = it },
+            modifier = Modifier.fillMaxSize().padding(top = maxHeight * 0.44f)
+                .zIndex(if (draggingFavorite) 2f else 0f),
         )
-        androidx.compose.foundation.layout.Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)) {
-            assistantContent()
-        }
+        AnimatedVisibility(
+            visible = !draggingFavorite,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+            enter = fadeIn(LauncherMotion.fade()) + scaleIn(LauncherMotion.settle(), initialScale = 0.88f),
+            exit = fadeOut(LauncherMotion.fade()) + scaleOut(LauncherMotion.settle(), targetScale = 0.8f),
+        ) { assistantContent() }
     }
 }
 
