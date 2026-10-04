@@ -212,6 +212,15 @@ fun LauncherApp(
                                 onLaunchApp = handleAppLaunch,
                                 onMoveFavorite = viewModel::moveFavorite,
                                 onRemoveFavorite = viewModel::removeFavorite,
+                                assistantContent = {
+                                    com.example.minimallauncher.ui.assistant.HomeAssistant(
+                                        apps = state.apps,
+                                        deviceSearch = deviceSearch,
+                                        onLaunchApp = handleAppLaunch,
+                                        isActive = !returningHome && currentScreen == LauncherScreen.HOME && appPendingLaunch == null && pagerState.settledPage == 0,
+                                        homeRequest = homeRequest,
+                                    )
+                                },
                             )
                             else Surface(modifier = Modifier.fillMaxSize()) {
                                 AppDrawerScreen(

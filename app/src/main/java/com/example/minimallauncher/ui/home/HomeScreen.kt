@@ -54,6 +54,7 @@ fun HomeScreen(
     onLaunchApp: (LaunchableApp) -> Unit,
     onMoveFavorite: (LaunchableApp, LaunchableApp) -> Unit,
     onRemoveFavorite: (LaunchableApp) -> Unit,
+    assistantContent: @Composable () -> Unit = {},
 ) {
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     var isDefaultLauncher by remember { mutableStateOf(true) }
@@ -207,6 +208,9 @@ fun HomeScreen(
             onRemoveFavorite = onRemoveFavorite,
             modifier = Modifier.fillMaxSize().padding(top = maxHeight * 0.44f),
         )
+        androidx.compose.foundation.layout.Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)) {
+            assistantContent()
+        }
     }
 }
 
