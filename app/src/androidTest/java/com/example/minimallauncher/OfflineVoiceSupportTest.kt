@@ -13,6 +13,96 @@ import java.util.concurrent.TimeUnit
 
 /** Check the installed service/model without requesting microphone access or recording. */
 class OfflineVoiceSupportTest {
+    @Test fun immediateRestartAfterCommandResultsKeepsServiceConnected() {
+        assumeTrue(Build.VERSION.SDK_INT >= 33)
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val complete = CountDownLatch(3)
+        val results = mutableListOf<String>()
+        var recognizer: com.example.minimallauncher.data.voice.OfflineVoiceRecognizer? = null
+        instrumentation.runOnMainSync {
+            recognizer = com.example.minimallauncher.data.voice.OfflineVoiceRecognizer(
+                instrumentation.targetContext,
+                onResult = { spoken ->
+                    results += spoken
+                    complete.countDown()
+                    // Same-sheet retry: the previous result is shown, then the user taps again.
+                    if (results.size < 3) recognizer!!.start(listOf("Camera"))
+                },
+                audioSourceFactory = { _, _ ->
+                    object : com.example.minimallauncher.data.voice.SpeechAudioSource {
+                        private val pipe = android.os.ParcelFileDescriptor.createPipe()
+                        private val active = java.util.concurrent.atomic.AtomicBoolean(true)
+                        override fun configure(intent: Intent) {
+                            com.example.minimallauncher.data.voice.configureSilentSpeechInput(intent, pipe[0])
+                        }
+                        override fun start() {
+                            Thread {
+                                runCatching {
+                                    android.os.ParcelFileDescriptor.AutoCloseOutputStream(pipe[1]).use { output ->
+                                        instrumentation.context.assets.open("open_camera_16khz.pcm").use { input ->
+                                            val bytes = ByteArray(640)
+                                            while (active.get()) {
+                                                val count = input.read(bytes)
+                                                if (count < 0) break
+                                                output.write(bytes, 0, count)
+                                                android.os.SystemClock.sleep(20)
+                                            }
+                                        }
+                                    }
+                                }
+                            }.apply { isDaemon = true; start() }
+                        }
+                        override fun close() {
+                            active.set(false)
+                            runCatching { pipe[0].close() }
+                            runCatching { pipe[1].close() }
+                        }
+                    }
+                },
+            )
+            recognizer!!.start(listOf("Camera"))
+        }
+        try {
+            assertTrue("Repeated command listening failed: ${recognizer!!.state.value.message}", complete.await(30, TimeUnit.SECONDS))
+            instrumentation.runOnMainSync {
+                assertTrue(results.all { it.lowercase().contains("open camera") })
+                assertTrue(!recognizer!!.state.value.busy)
+            }
+            android.os.SystemClock.sleep(500)
+            instrumentation.runOnMainSync { assertTrue("Late service callback overwrote the result", recognizer!!.state.value.message == "Tap to speak") }
+        } finally { instrumentation.runOnMainSync { recognizer?.close() } }
+    }
+
+    @Test fun slowStartKeepsListeningAndCancellationStopsRetries() {
+        assumeTrue(Build.VERSION.SDK_INT >= 33)
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        assumeTrue(context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED)
+        var recognizer: com.example.minimallauncher.data.voice.OfflineVoiceRecognizer? = null
+        instrumentation.runOnMainSync {
+            recognizer = com.example.minimallauncher.data.voice.OfflineVoiceRecognizer(context) {}
+            recognizer!!.start()
+        }
+        try {
+            var listeningShown = false
+            repeat(55) {
+                android.os.SystemClock.sleep(100)
+                instrumentation.runOnMainSync {
+                    val state = recognizer!!.state.value
+                    assertTrue("Listening ended during its grace period: ${state.message}", state.busy)
+                    if (state.message == "Listening…") listeningShown = true
+                    if (listeningShown) assertTrue("Status flickered during listening: ${state.message}", state.message == "Listening…")
+                }
+            }
+            instrumentation.runOnMainSync {
+                assertTrue("Listening ended before the initial grace period: ${recognizer!!.state.value.message}", recognizer!!.state.value.busy)
+                recognizer!!.cancel()
+            }
+            android.os.SystemClock.sleep(500)
+            instrumentation.runOnMainSync { assertTrue("Cancelled listening restarted", !recognizer!!.state.value.busy) }
+        } finally { instrumentation.runOnMainSync { recognizer?.close() } }
+    }
+
     @Test fun pixelOnDeviceRecognitionSupport() {
         assumeTrue(Build.VERSION.SDK_INT >= 33)
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -120,7 +210,9 @@ class OfflineVoiceSupportTest {
                     text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
                     finished.countDown()
                 }
-                override fun onSegmentResults(segmentResults: android.os.Bundle) { onResults(segmentResults) }
+                override fun onSegmentResults(segmentResults: android.os.Bundle) {
+                    if (segmentResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.any { it.isNotBlank() } == true) onResults(segmentResults)
+                }
                 override fun onEndOfSegmentedSession() { finished.countDown() }
                 override fun onPartialResults(partialResults: android.os.Bundle?) {}
                 override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
@@ -135,6 +227,8 @@ class OfflineVoiceSupportTest {
         val writer = Thread {
             runCatching {
                 android.os.ParcelFileDescriptor.AutoCloseOutputStream(pipes[1]).use { out ->
+                    // A natural pause after tapping the assistant must not end the session.
+                    repeat(75) { out.write(ByteArray(640)); android.os.SystemClock.sleep(20) }
                     instrumentation.context.assets.open("open_camera_16khz.pcm").use { input ->
                         val buffer = ByteArray(640)
                         while (true) {

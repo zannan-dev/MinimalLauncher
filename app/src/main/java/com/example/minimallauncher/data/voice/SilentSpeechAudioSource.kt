@@ -11,8 +11,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.log10
 import kotlin.math.sqrt
 
+internal interface SpeechAudioSource {
+    fun configure(intent: Intent)
+    fun start()
+    fun close()
+}
+
 /** Capture raw PCM ourselves so the speech provider receives an external, silent audio source. */
-internal class SilentSpeechAudioSource(private val onLevel: (Float) -> Unit, private val onFailure: () -> Unit) {
+internal class SilentSpeechAudioSource(private val onLevel: (Float) -> Unit, private val onFailure: () -> Unit) : SpeechAudioSource {
     private val pipes = ParcelFileDescriptor.createPipe()
     private val output = ParcelFileDescriptor.AutoCloseOutputStream(pipes[1])
     private val active = AtomicBoolean(false)
@@ -39,9 +45,9 @@ internal class SilentSpeechAudioSource(private val onLevel: (Float) -> Unit, pri
         }
     }
 
-    fun configure(intent: Intent) = configureSilentSpeechInput(intent, pipes[0])
+    override fun configure(intent: Intent) { configureSilentSpeechInput(intent, pipes[0]) }
 
-    fun start() {
+    override fun start() {
         recorder.startRecording()
         check(recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING)
         active.set(true)
@@ -81,7 +87,7 @@ internal class SilentSpeechAudioSource(private val onLevel: (Float) -> Unit, pri
         }, "Silent voice input").apply { isDaemon = true; start() }
     }
 
-    fun close() {
+    override fun close() {
         active.set(false)
         runCatching { recorder.stop() }
         runCatching { pipes[0].close() }
@@ -96,7 +102,8 @@ internal fun configureSilentSpeechInput(intent: Intent, descriptor: ParcelFileDe
     intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1)
     intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
     intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, 16_000)
-    intent.putExtra(RecognizerIntent.EXTRA_SEGMENTED_SESSION, RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS)
-    intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1_000)
-    intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 500)
+    // Keep the session alive with our microphone stream, including silent intermediate segments.
+    intent.putExtra(RecognizerIntent.EXTRA_SEGMENTED_SESSION, RecognizerIntent.EXTRA_AUDIO_SOURCE)
+    intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1_800)
+    intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 2_500)
 }

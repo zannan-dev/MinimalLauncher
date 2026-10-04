@@ -11,6 +11,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -206,8 +208,11 @@ fun HomeAssistant(
                         listening = state.listening,
                         level = state.level,
                     )
-                    Text(feedback.ifBlank { state.message }, style = MaterialTheme.typography.bodyLarge,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    Crossfade(targetState = feedback.ifBlank { state.message }, modifier = Modifier.fillMaxWidth(), animationSpec = tween(180),
+                        label = "Assistant status") { message ->
+                        Text(message, modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyLarge,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
                     if (transcript.isNotBlank() && feedback.isNotBlank()) {
                         Text(transcript, color = Color.White.copy(alpha = 0.5f),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center)

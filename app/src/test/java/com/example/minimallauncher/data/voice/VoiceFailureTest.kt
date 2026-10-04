@@ -5,6 +5,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class VoiceFailureTest {
+    @Test fun transientDisconnectIsRetriedOnceWithinTheOriginalDeadline() {
+        assertTrue(shouldReconnectSpeech(SpeechRecognizer.ERROR_SERVER_DISCONNECTED, 0, 100))
+        assertTrue(shouldReconnectSpeech(SpeechRecognizer.ERROR_SERVER_DISCONNECTED, 0, 18_999))
+        assertFalse(shouldReconnectSpeech(SpeechRecognizer.ERROR_SERVER_DISCONNECTED, 1, 100))
+        assertFalse(shouldReconnectSpeech(SpeechRecognizer.ERROR_SERVER_DISCONNECTED, 0, 19_000))
+        assertFalse(shouldReconnectSpeech(SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS, 0, 100))
+    }
+    @Test fun earlyEmptySessionsHaveABoundedGracePeriod() {
+        assertTrue(canRetryEmptySpeech(500))
+        assertTrue(canRetryEmptySpeech(7_999))
+        assertFalse(canRetryEmptySpeech(8_000))
+        assertFalse(canRetryEmptySpeech(20_000))
+        assertFalse(canRetryEmptySpeech(-1))
+    }
     @Test fun clientFailureDoesNotClaimOfflineModelIsUnavailable() {
         val state = recognitionFailure(SpeechRecognizer.ERROR_CLIENT, "English")
         assertEquals("Listening stopped. Tap to try again", state.message)
@@ -22,6 +36,6 @@ class VoiceFailureTest {
     }
     @Test fun busyAndDisconnectedServicesExplainTheActualFailure() {
         assertEquals("Please wait a moment, then try again", recognitionFailure(SpeechRecognizer.ERROR_RECOGNIZER_BUSY, "English").message)
-        assertEquals("Speech service disconnected. Try again", recognitionFailure(SpeechRecognizer.ERROR_SERVER_DISCONNECTED, "English").message)
+        assertEquals("Listening was interrupted. Tap to speak again", recognitionFailure(SpeechRecognizer.ERROR_SERVER_DISCONNECTED, "English").message)
     }
 }
