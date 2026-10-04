@@ -3,6 +3,7 @@ package com.example.minimallauncher.domain
 import java.util.Locale
 
 sealed interface VoiceCommand {
+    data class CallContact(val name: String) : VoiceCommand
     data class OpenApp(val name: String) : VoiceCommand
     data class OpenSetting(val name: String) : VoiceCommand
     data class OpenControls(val control: Control) : VoiceCommand
@@ -12,8 +13,12 @@ sealed interface VoiceCommand {
 /** Deliberately bounded local commands; no remote model or guessed system changes. */
 fun interpretVoiceCommand(transcript: String): VoiceCommand? {
     val words = transcript.lowercase(Locale.ROOT).replace(Regex("[^\\p{L}\\p{N} ]"), " ")
-        .replace(Regex("\\s+"), " ").trim().removePrefix("please ").removeSuffix(" please")
+        .replace(Regex("\\s+"), " ").trim().removePrefix("please ").removeSuffix(" please").removePrefix("can you ").removePrefix("could you ").removePrefix("please ")
     if (words.isBlank()) return null
+    val call = Regex("^(?:can you |could you )?(?:call|dial)(?: (.*))?$").matchEntire(words)
+    if (call != null) {
+        return call.groupValues[1].trim().takeIf { it.isNotBlank() }?.let(VoiceCommand::CallContact)
+    }
     val target = words.replace(Regex("^(?:can you |could you )?(?:turn on |turn off |switch on |switch off |enable |disable |open |launch |start |show |go to )"), "")
         .removeSuffix(" settings").trim()
     return when (target) {
@@ -23,7 +28,7 @@ fun interpretVoiceCommand(transcript: String): VoiceCommand? {
         "bluetooth", "blue tooth" -> VoiceCommand.OpenControls(VoiceCommand.Control.BLUETOOTH)
         "settings", "phone settings" -> VoiceCommand.OpenSetting("Phone settings")
         else -> if (words.startsWith("open ") || words.startsWith("launch ") || words.startsWith("start ")) {
-            VoiceCommand.OpenApp(target)
+            VoiceCommand.OpenApp(target.removePrefix("the ").removePrefix("app ").removeSuffix(" application").removeSuffix(" app").trim())
         } else VoiceCommand.OpenSetting(target)
     }
 }

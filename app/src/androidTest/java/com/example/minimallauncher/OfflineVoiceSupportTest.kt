@@ -128,6 +128,7 @@ class OfflineVoiceSupportTest {
             engine!!.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
+                putStringArrayListExtra(RecognizerIntent.EXTRA_BIASING_STRINGS, arrayListOf("Camera", "Blinkit", "AiCam Alert", "Shuhaib", "Umma"))
                 com.example.minimallauncher.data.voice.configureSilentSpeechInput(this, pipes[0])
             })
         }

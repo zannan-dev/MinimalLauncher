@@ -17,6 +17,7 @@ data class VoiceState(val message: String = "Tap to speak", val busy: Boolean = 
 class OfflineVoiceRecognizer(private val context: Context, private val onResult: (String) -> Unit) {
     private val mutableState = MutableStateFlow(VoiceState())
     val state = mutableState.asStateFlow()
+    private var nameHints: List<String> = emptyList()
     private var recognizer: SpeechRecognizer? = null
     private var acceptingResults = false
     private var destroyed = false
@@ -38,9 +39,13 @@ class OfflineVoiceRecognizer(private val context: Context, private val onResult:
         putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        if (Build.VERSION.SDK_INT >= 33) {
+            putStringArrayListExtra(RecognizerIntent.EXTRA_BIASING_STRINGS, ArrayList(nameHints))
+        }
     }
 
-    fun start() {
+    fun start(hints: List<String> = emptyList()) {
+        nameHints = hints.filter { it.isNotBlank() }.distinct()
         if (destroyed || mutableState.value.busy) return
         if (Build.VERSION.SDK_INT < 33 || !SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
             mutableState.value = VoiceState("Offline speech isn’t available on this device")
