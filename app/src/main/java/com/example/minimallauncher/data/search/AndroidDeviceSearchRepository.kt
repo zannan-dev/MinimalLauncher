@@ -6,10 +6,7 @@ import android.os.Bundle
 import android.net.Uri
 import android.provider.ContactsContract
 import android.provider.ContactsContract.Contacts
-import android.provider.ContactsContract.CommonDataKinds.Phone
 import com.example.minimallauncher.domain.DeviceSearchResult
-import com.example.minimallauncher.domain.ContactPhone
-import com.example.minimallauncher.domain.selectContactPhones
 import com.example.minimallauncher.domain.filterSettingsTargets
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
@@ -71,33 +68,6 @@ class AndroidDeviceSearchRepository(context: Context) : DeviceSearchRepository {
         matches.values.toList()
     }
 
-    override suspend fun contactPhones(query: String): List<ContactPhone> = withContext(Dispatchers.IO) {
-        if (query.isBlank()) return@withContext emptyList()
-        selectContactPhones(query, loadVoiceContacts())
-    }
-
-    override suspend fun voiceContactNames(): List<String> = withContext(Dispatchers.IO) {
-        loadVoiceContacts().map { it.name }.distinct()
-    }
-
-    private suspend fun loadVoiceContacts(): List<ContactPhone> {
-        val matches = mutableListOf<ContactPhone>()
-        // Read the local phone index before matching: provider filtering loses speech spelling variants.
-        val uri = Phone.CONTENT_URI
-        context.contentResolver.query(uri,
-            arrayOf(Phone.CONTACT_ID, Phone.DISPLAY_NAME_PRIMARY, Phone.NUMBER, Phone.TYPE, Phone.LABEL),
-            null, null, "${Phone.DISPLAY_NAME_PRIMARY} COLLATE LOCALIZED ASC",
-        )?.use { cursor ->
-            while (cursor.moveToNext()) {
-                kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                matches += ContactPhone(cursor.getLong(0), cursor.getString(1).orEmpty().ifBlank { "Contact" },
-                    cursor.getString(2).orEmpty(),
-                    Phone.getTypeLabel(context.resources, cursor.getInt(3), cursor.getString(4)).toString())
-            }
-        }
-        return matches
-    }
-
     override fun open(result: DeviceSearchResult): Boolean = try {
         context.startActivity(createDeviceSearchIntent(result))
         true
@@ -123,9 +93,3 @@ internal fun createDeviceSearchIntent(result: DeviceSearchResult): Intent = Inte
 
 internal const val SETTINGS_PREFERENCE_KEY = ":settings:fragment_args_key"
 internal const val SETTINGS_FRAGMENT_ARGUMENTS = ":settings:show_fragment_args"
-
-/** Encode the complete number (including extensions) without interpreting it as URI syntax. */
-internal fun createContactDialResult(contact: ContactPhone) = DeviceSearchResult(
-    "voice:call:${contact.contactId}", contact.name, "", Intent.ACTION_DIAL,
-    Uri.fromParts("tel", contact.number, null).toString(),
-)

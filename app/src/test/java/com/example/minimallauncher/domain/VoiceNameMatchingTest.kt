@@ -31,14 +31,6 @@ class VoiceNameMatchingTest {
         val duplicate = exact.copy(activityName = "WorkActivity")
         assertEquals(listOf(exact, duplicate), matchVoiceApps(listOf(app("Blinkist"), exact, duplicate), "blink it"))
     }
-    @Test fun contactMatchingSearchesWholeIndexWithoutLosingNumbers() {
-        val shuhaib = ContactPhone(1, "Shuhaib", "5550100", "Mobile")
-        val work = shuhaib.copy(number = "5550101", label = "Work")
-        val umma = ContactPhone(2, "Umma", "5550102", "Mobile")
-        assertEquals(listOf(shuhaib, work), selectContactPhones("shoaib", listOf(umma, shuhaib, work)))
-        assertEquals(listOf(umma), selectContactPhones("uma", listOf(shuhaib, umma)))
-        assertEquals(emptyList<ContactPhone>(), selectContactPhones("nobody", listOf(shuhaib, umma)))
-    }
     @Test fun politeAppCommandsAndTrailingAppWordKeepTheName() {
         assertEquals(VoiceCommand.OpenApp("blink it"), interpretVoiceCommand("Can you open Blink It please"))
         assertEquals(VoiceCommand.OpenApp("ai cam alert"), interpretVoiceCommand("Could you please open the AI Cam Alert app"))

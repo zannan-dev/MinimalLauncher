@@ -22,11 +22,11 @@ class VoiceCommandTest {
         assertEquals(VoiceCommand.OpenSetting("Phone settings"), interpretVoiceCommand("Open settings"))
         assertEquals(VoiceCommand.OpenSetting("build number"), interpretVoiceCommand("Build number"))
     }
-    @Test fun callsKeepNamesAndTakePrecedenceOverAppsAndSettings() {
-        assertEquals(VoiceCommand.CallContact("john smith"), interpretVoiceCommand("Please call John Smith."))
-        assertEquals(VoiceCommand.CallContact("mum"), interpretVoiceCommand("Could you call Mum please"))
-        assertEquals(VoiceCommand.CallContact("camera"), interpretVoiceCommand("Call Camera"))
-        assertEquals(VoiceCommand.CallContact("office settings"), interpretVoiceCommand("Dial Office Settings"))
+    @Test fun callingCommandsHaveNoAction() {
+        assertNull(interpretVoiceCommand("Please call John Smith."))
+        assertNull(interpretVoiceCommand("Could you call Mum please"))
+        assertNull(interpretVoiceCommand("Call Camera"))
+        assertNull(interpretVoiceCommand("Dial Office Settings"))
         assertNull(interpretVoiceCommand("call"))
         assertNull(interpretVoiceCommand("Can you dial please"))
     }
