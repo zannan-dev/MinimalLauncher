@@ -62,6 +62,27 @@ class LauncherAppTest {
     }
 
     @Test
+    fun swipingWhileAssistantIsOpenKeepsHomeAndAssistantVisible() {
+        val viewModel = LauncherViewModel(
+            applicationsRepository = TestApplicationsRepository(),
+            preferencesRepository = TestPreferencesRepository(),
+        )
+        composeRule.setContent {
+            LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
+        }
+        val clock = composeRule.onNodeWithContentDescription("Current time")
+        val initialX = clock.fetchSemanticsNode().positionInRoot.x
+        composeRule.onNodeWithContentDescription("Voice assistant").performClick()
+        composeRule.onRoot().performTouchInput { swipeLeft() }
+        composeRule.onRoot().performTouchInput { swipeDown() }
+        composeRule.onNodeWithContentDescription("Close assistant").assertIsDisplayed()
+        assertEquals(initialX, clock.fetchSemanticsNode().positionInRoot.x, 1f)
+        composeRule.onNodeWithContentDescription("Close assistant").performClick()
+        composeRule.onRoot().performTouchInput { swipeLeft() }
+        composeRule.onNodeWithText("Search apps...").assertIsDisplayed()
+    }
+
+    @Test
     fun leftSwipeOpensAppsAndRestoresScrollPosition() {
         val user = Process.myUserHandle()
         val apps = (0..40).map { index ->

@@ -1,6 +1,9 @@
 package com.example.minimallauncher.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.ui.zIndex
@@ -22,6 +25,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,8 +61,14 @@ fun HomeScreen(
     onLaunchApp: (LaunchableApp) -> Unit,
     onMoveFavorite: (LaunchableApp, LaunchableApp) -> Unit,
     onRemoveFavorite: (LaunchableApp) -> Unit,
-    assistantContent: @Composable () -> Unit = {},
+    assistantExpansion: androidx.compose.runtime.MutableState<Boolean>? = null,
+    assistantContent: @Composable (androidx.compose.runtime.MutableState<Boolean>) -> Unit = {},
 ) {
+    val assistantExpanded = assistantExpansion ?: remember { mutableStateOf(false) }
+    val favoriteAlpha by animateFloatAsState(if (assistantExpanded.value) 0f else 1f,
+        LauncherMotion.fade(), label = "Home favourites presence")
+    val headerAlpha by animateFloatAsState(if (assistantExpanded.value) 0.45f else 1f,
+        LauncherMotion.fade(), label = "Home context presence")
     var draggingFavorite by remember { mutableStateOf(false) }
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     var isDefaultLauncher by remember { mutableStateOf(true) }
@@ -137,7 +147,8 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(onOpenNotifications) {
+            .pointerInput(onOpenNotifications, assistantExpanded.value) {
+                if (assistantExpanded.value) return@pointerInput
                 var drag = 0f
                 var handled = false
                 val threshold = 72.dp.toPx()
@@ -153,7 +164,8 @@ fun HomeScreen(
                     onDragCancel = { drag = 0f; handled = false },
                 )
             }
-            .pointerInput(onOpenSettings) {
+            .pointerInput(onOpenSettings, assistantExpanded.value) {
+                if (assistantExpanded.value) return@pointerInput
                 detectTapGestures(
                     onLongPress = { onOpenSettings() },
                     onDoubleTap = {
@@ -168,7 +180,7 @@ fun HomeScreen(
             .padding(horizontal = 24.dp),
     ) {
         Column(
-            modifier = Modifier.align(Alignment.TopStart).padding(top = 8.dp),
+            modifier = Modifier.align(Alignment.TopStart).padding(top = 8.dp).graphicsLayer { alpha = headerAlpha },
             horizontalAlignment = Alignment.Start,
         ) {
             Text(
@@ -201,7 +213,7 @@ fun HomeScreen(
                     fontWeight = FontWeight.Normal,
                     color = Color.White,
                     textDecoration = TextDecoration.Underline,
-                    modifier = Modifier.clickable(onClick = onSetDefaultLauncher),
+                    modifier = Modifier.clickable(enabled = !assistantExpanded.value, onClick = onSetDefaultLauncher),
                 )
             }
         }
@@ -211,15 +223,19 @@ fun HomeScreen(
             onMoveFavorite = onMoveFavorite,
             onRemoveFavorite = onRemoveFavorite,
             onDragActiveChanged = { draggingFavorite = it },
+            enabled = !assistantExpanded.value,
             modifier = Modifier.fillMaxSize().padding(top = maxHeight * 0.44f)
-                .zIndex(if (draggingFavorite) 2f else 0f),
+                .zIndex(if (draggingFavorite) 2f else 0f)
+                .graphicsLayer { alpha = favoriteAlpha }
+                .then(if (assistantExpanded.value) Modifier.clearAndSetSemantics {} else Modifier),
         )
         AnimatedVisibility(
             visible = !draggingFavorite,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)
+                .heightIn(max = (maxHeight - 144.dp).coerceAtLeast(0.dp)),
             enter = fadeIn(LauncherMotion.fade()) + scaleIn(LauncherMotion.settle(), initialScale = 0.88f),
             exit = fadeOut(LauncherMotion.fade()) + scaleOut(LauncherMotion.settle(), targetScale = 0.8f),
-        ) { assistantContent() }
+        ) { assistantContent(assistantExpanded) }
     }
 }
 

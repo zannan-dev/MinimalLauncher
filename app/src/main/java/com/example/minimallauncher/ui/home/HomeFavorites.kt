@@ -72,6 +72,7 @@ fun HomeFavorites(
     onRemoveFavorite: (LaunchableApp) -> Unit,
     modifier: Modifier = Modifier,
     onDragActiveChanged: (Boolean) -> Unit = {},
+    enabled: Boolean = true,
 ) {
     var draggingKey by remember { mutableStateOf<String?>(null) }
     var dragPosition by remember { mutableStateOf(Offset.Zero) }
@@ -136,8 +137,9 @@ fun HomeFavorites(
                                 alpha = if (isDragging) 0f else 1f
                             }
                             .launcherPressFeedback(interactions)
-                            .clickable(interactionSource = interactions, indication = androidx.compose.material3.ripple()) { onLaunchApp(app) }
-                            .pointerInput(app.key) {
+                            .clickable(enabled = enabled, interactionSource = interactions, indication = androidx.compose.material3.ripple()) { onLaunchApp(app) }
+                            .pointerInput(app.key, enabled) {
+                                if (!enabled) return@pointerInput
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = { start ->
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)

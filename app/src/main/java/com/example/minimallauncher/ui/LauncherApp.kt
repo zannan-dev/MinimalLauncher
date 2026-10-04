@@ -112,6 +112,7 @@ fun LauncherApp(
     var currentScreenName by rememberSaveable { mutableStateOf(LauncherScreen.HOME.name) }
     val currentScreen = LauncherScreen.valueOf(currentScreenName)
     val pagerState = rememberPagerState(pageCount = { 2 })
+    val assistantExpansion = remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -200,7 +201,7 @@ fun LauncherApp(
                             flingBehavior = PagerDefaults.flingBehavior(pagerState, snapAnimationSpec = LauncherMotion.settle()),
                             modifier = Modifier.fillMaxSize(),
                             beyondViewportPageCount = 1,
-                            userScrollEnabled = appPendingLaunch == null,
+                            userScrollEnabled = appPendingLaunch == null && !assistantExpansion.value,
                         ) { page ->
                             if (page == 0) HomeScreen(
                                 favoriteApps = state.favoriteApps,
@@ -212,13 +213,16 @@ fun LauncherApp(
                                 onLaunchApp = handleAppLaunch,
                                 onMoveFavorite = viewModel::moveFavorite,
                                 onRemoveFavorite = viewModel::removeFavorite,
-                                assistantContent = {
+                                assistantExpansion = assistantExpansion,
+                                assistantContent = { expansionState ->
                                     com.example.minimallauncher.ui.assistant.HomeAssistant(
                                         apps = state.apps,
                                         deviceSearch = deviceSearch,
                                         onLaunchApp = handleAppLaunch,
-                                        isActive = !returningHome && currentScreen == LauncherScreen.HOME && appPendingLaunch == null && pagerState.settledPage == 0,
+                                        isActive = !returningHome && currentScreen == LauncherScreen.HOME && appPendingLaunch == null &&
+                                            pagerState.settledPage == 0 && !pagerState.isScrollInProgress,
                                         homeRequest = homeRequest,
+                                        expansionState = expansionState,
                                     )
                                 },
                             )

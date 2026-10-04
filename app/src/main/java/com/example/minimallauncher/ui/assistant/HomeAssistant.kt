@@ -7,9 +7,17 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.animateDpAsState
+import com.example.minimallauncher.ui.motion.LauncherMotion
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -34,7 +42,6 @@ import com.example.minimallauncher.data.search.createContactDialResult
 import com.example.minimallauncher.data.voice.OfflineVoiceRecognizer
 import com.example.minimallauncher.domain.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeAssistant(
     apps: List<LaunchableApp>,
@@ -42,10 +49,12 @@ fun HomeAssistant(
     onLaunchApp: (LaunchableApp) -> Unit,
     isActive: Boolean,
     homeRequest: Long,
+    expansionState: MutableState<Boolean>? = null,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    var visible by remember { mutableStateOf(false) }
+    val expansion = expansionState ?: remember { mutableStateOf(false) }
+    var visible by expansion
     var transcript by remember { mutableStateOf("") }
     var feedback by remember { mutableStateOf("") }
     var permissionDenied by remember { mutableStateOf(false) }
@@ -186,72 +195,72 @@ fun HomeAssistant(
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer); recognizer.close() }
     }
-    AssistantOrb(
-        onClick = { visible = true; start() },
-        description = "Voice assistant",
-        enabled = isActive,
-    )
-    if (visible) {
-        ModalBottomSheet(onDismissRequest = { visible = false }, dragHandle = null,
-            containerColor = Color.Black, contentColor = Color.White) {
-            Box(Modifier.fillMaxWidth()) {
-                IconButton(onClick = { visible = false }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-                    Icon(Icons.Outlined.Close, "Close assistant", tint = Color.White.copy(alpha = 0.6f))
-                }
-                Column(Modifier.fillMaxWidth().animateContentSize(spring(dampingRatio = 0.9f, stiffness = 400f)).padding(horizontal = 24.dp, vertical = 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    AssistantOrb(
-                        onClick = { if (state.busy) recognizer.cancel() else start() },
-                        description = if (state.busy) "Stop listening" else "Speak again",
-                        diameter = 144.dp,
-                        listening = state.listening,
-                        level = state.level,
-                    )
-                    Crossfade(targetState = feedback.ifBlank { state.message }, modifier = Modifier.fillMaxWidth(), animationSpec = tween(180),
-                        label = "Assistant status") { message ->
+    BackHandler(enabled = visible) { visible = false }
+    val orbSize by animateDpAsState(if (visible) 144.dp else 96.dp,
+        spring(dampingRatio = 0.82f, stiffness = 400f), label = "Assistant unfolds")
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val detailsHeight = (maxHeight - orbSize).coerceAtLeast(0.dp)
+        Column(Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally) {
+            AnimatedVisibility(visible = visible,
+                enter = fadeIn(LauncherMotion.fade()) + expandVertically(LauncherMotion.settle(), expandFrom = Alignment.Bottom),
+                exit = fadeOut(LauncherMotion.fade()) + shrinkVertically(LauncherMotion.settle(), shrinkTowards = Alignment.Bottom)) {
+                Column(Modifier.fillMaxWidth().heightIn(max = detailsHeight).animateContentSize(LauncherMotion.settle()).verticalScroll(rememberScrollState())
+                    .padding(bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(Modifier.fillMaxWidth()) {
+                        IconButton(onClick = { visible = false }, enabled = visible, modifier = Modifier.align(Alignment.CenterEnd)) {
+                            Icon(Icons.Outlined.Close, "Close assistant", tint = Color.White.copy(alpha = 0.6f))
+                        }
+                    }
+                    Crossfade(targetState = feedback.ifBlank { state.message }, modifier = Modifier.fillMaxWidth(),
+                        animationSpec = tween(180), label = "Assistant status") { message ->
                         Text(message, modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyLarge,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }
                     if (transcript.isNotBlank() && feedback.isNotBlank()) {
                         Text(transcript, color = Color.White.copy(alpha = 0.5f),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }
                     candidates.forEach { app ->
-                        TextButton(onClick = { visible = false; currentLaunch(app) }) { Text(app.label, color = Color.White) }
+                        TextButton(enabled = visible && isActive, onClick = { visible = false; currentLaunch(app) }) { Text(app.label, color = Color.White) }
                     }
-                    if (contactCandidates.isNotEmpty()) {
-                        Column(Modifier.fillMaxWidth().heightIn(max = 240.dp).verticalScroll(rememberScrollState())) {
-                            contactCandidates.forEach { contact ->
-                                TextButton(onClick = { dial(contact) }, modifier = Modifier.fillMaxWidth()) {
-                                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Text(contact.name, color = Color.White, style = MaterialTheme.typography.bodyLarge)
-                                        Text("${contact.label} · ${contact.number}", color = Color.White.copy(alpha = 0.6f),
-                                            style = MaterialTheme.typography.bodyMedium)
-                                    }
-                                }
+                    contactCandidates.forEach { contact ->
+                        TextButton(enabled = visible && isActive, onClick = { dial(contact) }, modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(contact.name, color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                                Text("${contact.label} · ${contact.number}", color = Color.White.copy(alpha = 0.6f),
+                                    style = MaterialTheme.typography.bodyMedium)
                             }
                         }
                     }
                     if (contactsPermissionNeeded) {
                         val openPermissionSettings = contactsDenied &&
                             (context as? Activity)?.shouldShowRequestPermissionRationale(Manifest.permission.READ_CONTACTS) == false
-                        TextButton(onClick = {
+                        TextButton(enabled = visible && isActive, onClick = {
                             if (openPermissionSettings) {
                                 context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
                             } else contactsPermission.launch(Manifest.permission.READ_CONTACTS)
                         }) { Text(if (openPermissionSettings) "Contact permissions" else "Allow contacts", color = Color.White) }
                     }
                     if (state.needsModel && Build.VERSION.SDK_INT >= 33) {
-                        TextButton(onClick = recognizer::downloadModel) { Text("Download offline speech", color = Color.White) }
+                        TextButton(enabled = visible && isActive, onClick = recognizer::downloadModel) { Text("Download offline speech", color = Color.White) }
                     }
                     if (permissionDenied) {
-                        TextButton(onClick = {
+                        TextButton(enabled = visible && isActive, onClick = {
                             context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
                         }) { Text("Microphone permission", color = Color.White) }
                     }
                 }
             }
+            AssistantOrb(
+                onClick = {
+                    if (!visible) { visible = true; start() }
+                    else if (state.busy) recognizer.cancel() else start()
+                },
+                description = if (!visible) "Voice assistant" else if (state.busy) "Stop listening" else "Speak again",
+                diameter = orbSize, listening = visible && state.listening, level = state.level, enabled = isActive,
+            )
         }
     }
 }
