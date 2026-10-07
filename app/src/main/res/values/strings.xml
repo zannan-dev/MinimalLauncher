@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">Minimal Launcher</string>
-    <string name="accessibility_service_description">Used by Minimal Launcher to allow double-tap to lock the screen.</string>
+    <string name="accessibility_service_description">Used by Minimal Launcher to lock the screen with a double-tap or voice command.</string>
 </resources>

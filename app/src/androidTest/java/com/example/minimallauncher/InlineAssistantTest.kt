@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import com.example.minimallauncher.domain.LaunchableApp
@@ -18,10 +19,11 @@ class InlineAssistantTest {
     @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
     private val homeRequest = mutableStateOf(0L)
     private val active = mutableStateOf(true)
+    private val expanded = mutableStateOf(false)
     private fun show() {
         composeRule.setContent {
             HomeScreen(favoriteApps = listOf(LaunchableApp("camera", "Activity", "Camera", Process.myUserHandle(), false)),
-                showDate = true, doubleTapToLock = false, onOpenSearch = {}, onOpenSettings = {},
+                showDate = true, doubleTapToLock = false, assistantExpansion = expanded, onOpenSearch = {}, onOpenSettings = {},
                 onSetDefaultLauncher = {}, onLaunchApp = {}, onMoveFavorite = { _, _ -> }, onRemoveFavorite = {},
                 assistantContent = { expansion ->
                     HomeAssistant(apps = emptyList(), deviceSearch = null, onLaunchApp = {},
@@ -31,8 +33,9 @@ class InlineAssistantTest {
     }
     private fun open() {
         show()
-        composeRule.onNodeWithContentDescription("Voice assistant").performClick()
-        composeRule.onNodeWithContentDescription("Close assistant").assertIsDisplayed()
+        composeRule.runOnIdle { expanded.value = true }
+        composeRule.onNodeWithTag("Assistant status").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Close assistant").assertDoesNotExist()
         // The home context stays in the same composition and window; favourites yield their space.
         composeRule.onNodeWithContentDescription("Current time").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Favorite Camera").assertDoesNotExist()
@@ -42,9 +45,9 @@ class InlineAssistantTest {
         composeRule.onNodeWithContentDescription("Voice assistant").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Favorite Camera").assertIsDisplayed()
     }
-    @Test fun closeRestoresHomeFavorites() {
+    @Test fun outsideTapRestoresHomeFavorites() {
         open()
-        composeRule.onNodeWithContentDescription("Close assistant").performClick()
+        composeRule.onNodeWithContentDescription("Current time").performTouchInput { down(center); up() }
         assertRestored()
     }
     @Test fun backClosesInlineAssistantBeforeLeavingHome() {
@@ -52,10 +55,10 @@ class InlineAssistantTest {
         composeRule.runOnUiThread { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
         assertRestored()
     }
-    @Test fun tappingHomeBackgroundKeepsAssistantOpen() {
+    @Test fun tappingAssistantResultKeepsAssistantOpen() {
         open()
-        composeRule.onNodeWithContentDescription("Current time").performTouchInput { down(center); up() }
-        composeRule.onNodeWithContentDescription("Close assistant").assertIsDisplayed()
+        composeRule.onNodeWithTag("Assistant status").performTouchInput { down(center); up() }
+        composeRule.onNodeWithTag("Assistant status").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Favorite Camera").assertDoesNotExist()
     }
     @Test fun homeRequestDismissesAssistant() {

@@ -2,6 +2,8 @@ package com.example.minimallauncher.ui.home
 
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.graphics.graphicsLayer
@@ -22,11 +24,16 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -167,7 +174,11 @@ fun HomeScreen(
                 )
             }
             .pointerInput(onOpenSettings, assistantExpanded.value, searchVisible, gesturesEnabled) {
-                if (!gesturesEnabled || assistantExpanded.value || searchVisible) return@pointerInput
+                if (!gesturesEnabled || searchVisible) return@pointerInput
+                if (assistantExpanded.value) {
+                    detectTapGestures(onTap = { assistantExpanded.value = false })
+                    return@pointerInput
+                }
                 detectTapGestures(
                     onLongPress = { onOpenSettings() },
                     onDoubleTap = {
@@ -269,7 +280,7 @@ fun BatteryStatus() {
                 val status: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
                 val plugged: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, -1)
                 val isPlugged = plugged > 0
-                isCharging = isPlugged || status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
+                isCharging = isPlugged || status == android.os.BatteryManager.BATTERY_STATUS_CHARGING
             }
         }
 
@@ -286,7 +297,7 @@ fun BatteryStatus() {
                     val status: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
                     val plugged: Int = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, -1)
                     val isPlugged = plugged > 0
-                    isCharging = isPlugged || status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
+                    isCharging = isPlugged || status == android.os.BatteryManager.BATTERY_STATUS_CHARGING
                 }
             } else if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
                 if (isRegistered) {
@@ -307,11 +318,23 @@ fun BatteryStatus() {
     }
 
     if (batteryPct >= 0) {
-        Text(
-            text = (if (isCharging) "+" else "") + "${batteryPct.toInt()}%",
-            fontSize = 14.sp,
-            color = Color.White,
+        Row(
             modifier = Modifier.padding(top = 4.dp),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AnimatedVisibility(
+                visible = isCharging,
+                enter = fadeIn(LauncherMotion.fade()) + expandHorizontally(LauncherMotion.settle(), expandFrom = Alignment.Start),
+                exit = fadeOut(LauncherMotion.fade()) + shrinkHorizontally(LauncherMotion.settle(), shrinkTowards = Alignment.Start),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Bolt,
+                    contentDescription = "Charging",
+                    tint = Color.White,
+                    modifier = Modifier.padding(end = 4.dp).size(16.dp),
+                )
+            }
+            Text(text = "${batteryPct.toInt()}%", fontSize = 14.sp, color = Color.White)
+        }
     }
 }

@@ -23,13 +23,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Close
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -37,6 +38,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.minimallauncher.data.search.DeviceSearchRepository
+import com.example.minimallauncher.LauncherAccessibilityService
 import com.example.minimallauncher.data.voice.OfflineVoiceRecognizer
 import com.example.minimallauncher.domain.*
 
@@ -56,6 +58,7 @@ fun HomeAssistant(
     var transcript by remember { mutableStateOf("") }
     var feedback by remember { mutableStateOf("") }
     var permissionDenied by remember { mutableStateOf(false) }
+    var needsLockAccessibility by remember { mutableStateOf(false) }
     var candidates by remember { mutableStateOf(emptyList<LaunchableApp>()) }
     val currentApps by rememberUpdatedState(apps)
     val currentSearch by rememberUpdatedState(deviceSearch)
@@ -75,6 +78,16 @@ fun HomeAssistant(
                 val certainApp = appMatches.singleOrNull()?.takeIf { voiceNameScore(target, it.label) >= if (command is VoiceCommand.OpenApp) 90 else 100 }
                 when {
                     command == null -> feedback = "Try “Open Camera” or “Wi-Fi”"
+                    command is VoiceCommand.LockScreen -> {
+                        candidates = emptyList()
+                        if (LauncherAccessibilityService.lockScreen()) {
+                            visible = false
+                        } else {
+                            needsLockAccessibility = LauncherAccessibilityService.instance == null
+                            feedback = if (needsLockAccessibility) "Enable Minimal Launcher in Accessibility to lock the screen"
+                                else "Couldn’t lock the screen. Try again"
+                        }
+                    }
                     command is VoiceCommand.OpenControls -> {
                         val destination = when (command.control) {
                             VoiceCommand.Control.WIFI -> DeviceSearchResult("voice:wifi", "Wi-Fi controls", "", if (Build.VERSION.SDK_INT >= 29) Settings.Panel.ACTION_WIFI else Settings.ACTION_WIFI_SETTINGS)
@@ -102,6 +115,7 @@ fun HomeAssistant(
     fun listen() {
         transcript = ""
         feedback = ""
+        needsLockAccessibility = false
         candidates = emptyList()
         recognizer.start(currentApps.map { it.label })
     }
@@ -143,18 +157,14 @@ fun HomeAssistant(
                 Column(Modifier.fillMaxWidth().heightIn(max = detailsHeight).animateContentSize(LauncherMotion.settle()).verticalScroll(rememberScrollState())
                     .padding(bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.fillMaxWidth()) {
-                        IconButton(onClick = { visible = false }, enabled = visible, modifier = Modifier.align(Alignment.CenterEnd)) {
-                            Icon(Icons.Outlined.Close, "Close assistant", tint = Color.White.copy(alpha = 0.6f))
-                        }
-                    }
                     Crossfade(targetState = feedback.ifBlank { state.message }, modifier = Modifier.fillMaxWidth(),
                         animationSpec = tween(180), label = "Assistant status") { message ->
-                        Text(message, modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyLarge,
+                        Text(message, modifier = Modifier.fillMaxWidth().testTag("Assistant status")
+                            .pointerInput(Unit) { detectTapGestures(onTap = {}) }, style = MaterialTheme.typography.bodyLarge,
                             color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }
                     if (transcript.isNotBlank() && feedback.isNotBlank()) {
-                        Text(transcript, color = Color.White.copy(alpha = 0.5f),
+                        Text(transcript, modifier = Modifier.pointerInput(Unit) { detectTapGestures(onTap = {}) }, color = Color.White.copy(alpha = 0.5f),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }
                     candidates.forEach { app ->
@@ -167,6 +177,11 @@ fun HomeAssistant(
                         TextButton(enabled = visible && isActive, onClick = {
                             context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
                         }) { Text("Microphone permission", color = Color.White) }
+                    }
+                    if (needsLockAccessibility) {
+                        TextButton(enabled = visible && isActive, onClick = {
+                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        }) { Text("Accessibility settings", color = Color.White) }
                     }
                 }
             }

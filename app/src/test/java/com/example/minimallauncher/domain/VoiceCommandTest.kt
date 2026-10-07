@@ -5,6 +5,16 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class VoiceCommandTest {
+    @Test fun screenLockCommandsAreRecognized() {
+        listOf("Lock the screen", "lock screen", "Please lock the screen.",
+            "Can you lock the screen please", "Could you please lock the phone?", "Lock device")
+            .forEach { assertEquals(VoiceCommand.LockScreen, interpretVoiceCommand(it)) }
+    }
+    @Test fun lockSettingsAndAppNamesRemainSearchable() {
+        assertEquals(VoiceCommand.OpenSetting("lock screen"), interpretVoiceCommand("Lock screen settings"))
+        assertEquals(VoiceCommand.OpenApp("lock screen"), interpretVoiceCommand("Open Lock Screen"))
+        assertEquals(VoiceCommand.OpenSetting("do not lock the screen"), interpretVoiceCommand("Do not lock the screen"))
+    }
     @Test fun appCommandsKeepMultiwordNames() {
         assertEquals(VoiceCommand.OpenApp("google maps"), interpretVoiceCommand("Please open Google Maps."))
         assertEquals(VoiceCommand.OpenApp("camera"), interpretVoiceCommand("Launch Camera please"))

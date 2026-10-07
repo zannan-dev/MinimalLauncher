@@ -3,6 +3,7 @@ package com.example.minimallauncher.domain
 import java.util.Locale
 
 sealed interface VoiceCommand {
+    data object LockScreen : VoiceCommand
     data class OpenApp(val name: String) : VoiceCommand
     data class OpenSetting(val name: String) : VoiceCommand
     data class OpenControls(val control: Control) : VoiceCommand
@@ -14,6 +15,7 @@ fun interpretVoiceCommand(transcript: String): VoiceCommand? {
     val words = transcript.lowercase(Locale.ROOT).replace(Regex("[^\\p{L}\\p{N} ]"), " ")
         .replace(Regex("\\s+"), " ").trim().removePrefix("please ").removeSuffix(" please").removePrefix("can you ").removePrefix("could you ").removePrefix("please ")
     if (words.isBlank()) return null
+    if (words in setOf("lock the screen", "lock screen", "lock the phone", "lock phone", "lock the device", "lock device")) return VoiceCommand.LockScreen
     if (words == "call" || words == "dial" || words.startsWith("call ") || words.startsWith("dial ")) return null
     val target = words.replace(Regex("^(?:can you |could you )?(?:turn on |turn off |switch on |switch off |enable |disable |open |launch |start |show |go to )"), "")
         .removeSuffix(" settings").trim()
