@@ -23,6 +23,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -247,6 +248,13 @@ fun HomeScreen(
                 .graphicsLayer { alpha = favoriteAlpha * (1f - LauncherMotion.reveal(searchProgress)) }
                 .then(if (assistantExpanded.value || searchVisible) Modifier.clearAndSetSemantics {} else Modifier),
         )
+        if (assistantExpanded.value && !searchVisible && gesturesEnabled) {
+            // Faded-out favourites still participate in hit testing. Catch outside taps
+            // above them, while leaving the assistant's controls on top.
+            Box(Modifier.matchParentSize().pointerInput(assistantExpanded) {
+                detectTapGestures(onTap = { assistantExpanded.value = false })
+            })
+        }
         AnimatedVisibility(
             visible = !draggingFavorite,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)

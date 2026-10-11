@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import com.example.minimallauncher.domain.LaunchableApp
@@ -20,11 +21,13 @@ class InlineAssistantTest {
     private val homeRequest = mutableStateOf(0L)
     private val active = mutableStateOf(true)
     private val expanded = mutableStateOf(false)
-    private fun show() {
+    private fun show(favoriteCount: Int = 1) {
         composeRule.setContent {
-            HomeScreen(favoriteApps = listOf(LaunchableApp("camera", "Activity", "Camera", Process.myUserHandle(), false)),
+            HomeScreen(favoriteApps = List(favoriteCount) { index ->
+                LaunchableApp("camera$index", "Activity", if (index == 0) "Camera" else "App $index", Process.myUserHandle(), false)
+            },
                 showDate = true, doubleTapToLock = false, assistantExpansion = expanded, onOpenSearch = {}, onOpenSettings = {},
-                onSetDefaultLauncher = {}, onLaunchApp = {}, onMoveFavorite = { _, _ -> }, onRemoveFavorite = {},
+                onSetDefaultLauncher = {}, onLaunchApp = { error("Outside tap launched a hidden favourite") }, onMoveFavorite = { _, _ -> }, onRemoveFavorite = {},
                 assistantContent = { expansion ->
                     HomeAssistant(apps = emptyList(), deviceSearch = null, onLaunchApp = {},
                         isActive = active.value, homeRequest = homeRequest.value, expansionState = expansion)
@@ -49,6 +52,21 @@ class InlineAssistantTest {
         open()
         composeRule.onNodeWithContentDescription("Current time").performTouchInput { down(center); up() }
         assertRestored()
+    }
+    private fun tapHiddenFavorite(favoriteCount: Int) {
+        show(favoriteCount)
+        val favoriteCenter = composeRule.onNodeWithContentDescription("Favorite Camera")
+            .fetchSemanticsNode().boundsInRoot.center
+        composeRule.runOnIdle { expanded.value = true }
+        composeRule.onNodeWithTag("Assistant status").assertIsDisplayed()
+        composeRule.onRoot().performTouchInput { down(favoriteCenter); up() }
+        assertRestored()
+    }
+    @Test fun tapOverHiddenFavoriteDismissesAssistant() {
+        tapHiddenFavorite(1)
+    }
+    @Test fun tapOverScrollableHiddenFavoritesDismissesAssistant() {
+        tapHiddenFavorite(30)
     }
     @Test fun backClosesInlineAssistantBeforeLeavingHome() {
         open()
