@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.minimallauncher.domain.toggledFavorite
+import com.example.minimallauncher.domain.toggledHomeFavorite
 import com.example.minimallauncher.domain.orderedFavoriteKeys
 import com.example.minimallauncher.domain.movedFavorite
 import kotlinx.coroutines.flow.Flow
@@ -70,7 +71,8 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
     override suspend fun toggleFavorite(appKey: String) {
         applicationContext.launcherDataStore.edit { values ->
             val favorites = values[FAVORITE_APP_KEYS].orEmpty()
-            val updated = toggledFavorite(favorites, appKey)
+            val updated = toggledHomeFavorite(favorites, appKey)
+            if (updated == favorites) return@edit
             val order = orderedFavoriteKeys(favorites, decodeFavoriteOrder(values[FAVORITE_APP_ORDER]))
             values[FAVORITE_APP_KEYS] = updated
             values[FAVORITE_APP_ORDER] = encodeFavoriteOrder(

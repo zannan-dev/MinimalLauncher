@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -123,6 +122,7 @@ fun HomeFavorites(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().padding(bottom = 128.dp),
+            verticalArrangement = Arrangement.Center,
             userScrollEnabled = listState.canScrollForward || listState.canScrollBackward,
         ) {
             items(visibleApps, key = { it.key }) { app ->

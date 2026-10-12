@@ -6,7 +6,7 @@ import com.example.minimallauncher.data.preferences.LauncherPreferences
 import com.example.minimallauncher.data.preferences.LauncherPreferencesRepository
 import com.example.minimallauncher.data.preferences.ThemePreference
 import com.example.minimallauncher.domain.LaunchableApp
-import com.example.minimallauncher.domain.toggledFavorite
+import com.example.minimallauncher.domain.toggledHomeFavorite
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -54,6 +54,22 @@ class LauncherViewModelTest {
 
         assertEquals(listOf(camera), viewModel.uiState.value.favoriteApps)
         assertEquals(ThemePreference.DARK, viewModel.uiState.value.preferences.theme)
+    }
+
+    @Test
+    fun `legacy favorites show only the first ten installed apps in saved order`() {
+        val apps = (1..12).map {
+            LaunchableApp("app$it", "Activity", "App $it", userHandle, false)
+        }
+        val order = apps.reversed().map { it.key }
+        val state = LauncherUiState(apps = apps).let {
+            it.copy(preferences = it.preferences.copy(
+                favoriteAppKeys = order.toSet(),
+                favoriteAppOrder = listOf("uninstalled") + order,
+            ))
+        }
+        assertEquals(apps.reversed().take(10), state.favoriteApps)
+        assertEquals(order.toSet(), state.preferences.favoriteAppKeys)
     }
 
     @Test
@@ -112,7 +128,8 @@ private class FakePreferencesRepository : LauncherPreferencesRepository {
 
     override suspend fun toggleFavorite(appKey: String) {
         val current = state.value
-        val updated = toggledFavorite(current.favoriteAppKeys, appKey)
+        val updated = toggledHomeFavorite(current.favoriteAppKeys, appKey)
+        if (updated == current.favoriteAppKeys) return
         state.value = current.copy(
             favoriteAppKeys = updated,
             favoriteAppOrder = if (appKey in updated) current.favoriteAppOrder + appKey

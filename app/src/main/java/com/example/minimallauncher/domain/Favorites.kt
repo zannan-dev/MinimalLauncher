@@ -1,5 +1,12 @@
 package com.example.minimallauncher.domain
 
+const val MAX_HOME_FAVORITES = 10
+
+/** Rejects additions at the home limit while always allowing removal. */
+fun toggledHomeFavorite(favorites: Set<String>, appKey: String): Set<String> =
+    if (appKey !in favorites && favorites.size >= MAX_HOME_FAVORITES) favorites
+    else toggledFavorite(favorites, appKey)
+
 /** Adds [appKey] to favorites or removes it when it is already present. */
 fun toggledFavorite(favorites: Set<String>, appKey: String): Set<String> =
     if (appKey in favorites) favorites - appKey else favorites + appKey

@@ -107,6 +107,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import com.example.minimallauncher.domain.LaunchableApp
+import com.example.minimallauncher.domain.MAX_HOME_FAVORITES
 import com.example.minimallauncher.domain.filterApps
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -389,6 +390,7 @@ fun HomeSearchScreen(
                 AppResultRow(
                     app = app,
                     isFavorite = app.key in favoriteKeys,
+                    favoriteLimitReached = favoriteKeys.size >= MAX_HOME_FAVORITES,
                     showOptions = optionsAppKey == app.key,
                     onToggleOptions = { show ->
                         optionsAppKey = if (show) app.key else null
@@ -549,6 +551,7 @@ fun HomeSearchScreen(
 private fun AppResultRow(
     app: LaunchableApp,
     isFavorite: Boolean,
+    favoriteLimitReached: Boolean,
     showOptions: Boolean,
     onToggleOptions: (Boolean) -> Unit,
     onLaunchApp: (LaunchableApp) -> Unit,
@@ -592,7 +595,13 @@ private fun AppResultRow(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = {
-                    onToggleFavorite(app)
+                    if (!isFavorite && favoriteLimitReached) {
+                        Toast.makeText(context,
+                            "You can have up to $MAX_HOME_FAVORITES favourites. Remove one to add another.",
+                            Toast.LENGTH_SHORT).show()
+                    } else {
+                        onToggleFavorite(app)
+                    }
                     onToggleOptions(false)
                 }) {
                     Icon(

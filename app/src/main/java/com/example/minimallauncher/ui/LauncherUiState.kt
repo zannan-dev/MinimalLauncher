@@ -3,6 +3,7 @@ package com.example.minimallauncher.ui
 import com.example.minimallauncher.data.preferences.LauncherPreferences
 import com.example.minimallauncher.data.preferences.ThemePreference
 import com.example.minimallauncher.domain.LaunchableApp
+import com.example.minimallauncher.domain.MAX_HOME_FAVORITES
 
 data class LauncherUiState(
     val apps: List<LaunchableApp> = emptyList(),
@@ -23,6 +24,6 @@ data class LauncherUiState(
     val favoriteApps: List<LaunchableApp>
         get() {
             val appsByKey = apps.associateBy { it.key }
-            return preferences.favoriteAppOrder.mapNotNull(appsByKey::get)
+            return preferences.favoriteAppOrder.mapNotNull(appsByKey::get).take(MAX_HOME_FAVORITES)
         }
 }

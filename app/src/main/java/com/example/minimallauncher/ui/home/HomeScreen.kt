@@ -197,57 +197,59 @@ fun HomeScreen(
             assistantExpanded.value -> 0.45f
             else -> 1f
         }, LauncherMotion.fade(), label = "Home context presence")
-        Column(
-            modifier = Modifier.align(Alignment.TopStart).padding(top = 8.dp).graphicsLayer { alpha = headerAlpha * (1f - LauncherMotion.reveal(searchProgress)) }
-                .then(if (searchVisible) Modifier.clearAndSetSemantics {} else Modifier),
-            horizontalAlignment = Alignment.Start,
-        ) {
-            Text(
-                text = now.format(timeFormatter),
-                fontSize = 25.sp,
-                lineHeight = 32.sp,
-                color = Color.White,
-                modifier = Modifier.semantics { contentDescription = "Current time" },
-            )
-            AnimatedVisibility(
-                visible = showDate,
-                enter = expandVertically(LauncherMotion.settle()) + fadeIn(LauncherMotion.fade()),
-                exit = shrinkVertically(LauncherMotion.settle()) + fadeOut(LauncherMotion.fade()),
+        Column(Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.padding(top = 8.dp).graphicsLayer { alpha = headerAlpha * (1f - LauncherMotion.reveal(searchProgress)) }
+                    .then(if (searchVisible) Modifier.clearAndSetSemantics {} else Modifier),
+                horizontalAlignment = Alignment.Start,
             ) {
-                Column {
+                Text(
+                    text = now.format(timeFormatter),
+                    fontSize = 25.sp,
+                    lineHeight = 32.sp,
+                    color = Color.White,
+                    modifier = Modifier.semantics { contentDescription = "Current time" },
+                )
+                AnimatedVisibility(
+                    visible = showDate,
+                    enter = expandVertically(LauncherMotion.settle()) + fadeIn(LauncherMotion.fade()),
+                    exit = shrinkVertically(LauncherMotion.settle()) + fadeOut(LauncherMotion.fade()),
+                ) {
+                    Column {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = dateText,
+                            fontSize = 13.sp,
+                            color = Color.White,
+                        )
+                    }
+                }
+                BatteryStatus()
+                if (!isDefaultLauncher) {
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = dateText,
+                        "Set as default launcher",
                         fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal,
                         color = Color.White,
+                        textDecoration = TextDecoration.Underline,
+                        modifier = Modifier.clickable(enabled = !assistantExpanded.value && !searchVisible, onClick = onSetDefaultLauncher),
                     )
                 }
             }
-            BatteryStatus()
-            if (!isDefaultLauncher) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Set as default launcher",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = Color.White,
-                    textDecoration = TextDecoration.Underline,
-                    modifier = Modifier.clickable(enabled = !assistantExpanded.value && !searchVisible, onClick = onSetDefaultLauncher),
-                )
-            }
+            HomeFavorites(
+                apps = favoriteApps,
+                onLaunchApp = onLaunchApp,
+                onMoveFavorite = onMoveFavorite,
+                onRemoveFavorite = onRemoveFavorite,
+                onDragActiveChanged = { draggingFavorite = it },
+                enabled = !assistantExpanded.value && !searchVisible,
+                modifier = Modifier.weight(1f).padding(top = 24.dp)
+                    .zIndex(if (draggingFavorite) 2f else 0f)
+                    .graphicsLayer { alpha = favoriteAlpha * (1f - LauncherMotion.reveal(searchProgress)) }
+                    .then(if (assistantExpanded.value || searchVisible) Modifier.clearAndSetSemantics {} else Modifier),
+            )
         }
-        HomeFavorites(
-            apps = favoriteApps,
-            onLaunchApp = onLaunchApp,
-            onMoveFavorite = onMoveFavorite,
-            onRemoveFavorite = onRemoveFavorite,
-            onDragActiveChanged = { draggingFavorite = it },
-            enabled = !assistantExpanded.value && !searchVisible,
-            modifier = Modifier.fillMaxSize().padding(top = maxHeight * 0.44f)
-                .zIndex(if (draggingFavorite) 2f else 0f)
-                .graphicsLayer { alpha = favoriteAlpha * (1f - LauncherMotion.reveal(searchProgress)) }
-                .then(if (assistantExpanded.value || searchVisible) Modifier.clearAndSetSemantics {} else Modifier),
-        )
         if (assistantExpanded.value && !searchVisible && gesturesEnabled) {
             // Faded-out favourites still participate in hit testing. Catch outside taps
             // above them, while leaving the assistant's controls on top.

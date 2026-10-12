@@ -3,6 +3,12 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+composeCompiler {
+    // The plugin requests an unavailable compose-group-mapping:2.2.10 artifact.
+    // Omit the optional Compose mapping file; release optimization stays enabled.
+    includeComposeMappingFile.set(false)
+}
+
 android {
     namespace = "com.example.minimallauncher"
     compileSdk {
