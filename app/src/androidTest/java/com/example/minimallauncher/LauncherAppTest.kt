@@ -11,6 +11,9 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso
 import androidx.compose.ui.test.assertIsFocused
@@ -73,6 +76,29 @@ class LauncherAppTest {
         }
 
         composeRule.onNodeWithContentDescription("Current time").assertIsDisplayed()
+    }
+
+    @Test
+    fun assistantCanBeDisabledAndEnabledInSettings() {
+        val viewModel = LauncherViewModel(
+            applicationsRepository = TestApplicationsRepository(),
+            preferencesRepository = TestPreferencesRepository(),
+        )
+        composeRule.setContent {
+            LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
+        }
+
+        composeRule.onNodeWithContentDescription("Voice assistant").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Current time").performTouchInput { longClick() }
+        composeRule.onNodeWithText("Use assistant").assertIsOn().performClick().assertIsOff()
+        Espresso.pressBack()
+        composeRule.onNodeWithContentDescription("Voice assistant").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Current time").assertIsDisplayed()
+
+        composeRule.onNodeWithContentDescription("Current time").performTouchInput { longClick() }
+        composeRule.onNodeWithText("Use assistant").performClick().assertIsOn()
+        Espresso.pressBack()
+        composeRule.onNodeWithContentDescription("Voice assistant").assertIsDisplayed()
     }
 
     @Test
@@ -631,6 +657,9 @@ private class TestPreferencesRepository(
     override suspend fun setShowDate(enabled: Boolean) = Unit
     override suspend fun setAutoOpenKeyboard(enabled: Boolean) = Unit
     override suspend fun setDoubleTapToLock(enabled: Boolean) = Unit
+    override suspend fun setAssistantEnabled(enabled: Boolean) {
+        state.value = state.value.copy(isAssistantEnabled = enabled)
+    }
     override suspend fun setShowStatusBar(enabled: Boolean) = Unit
     override suspend fun setIntentionalPilotEnabled(enabled: Boolean) = Unit
     override suspend fun toggleIntentionalPilotApp(appKey: String) = Unit

@@ -45,12 +45,14 @@ fun SettingsScreen(
     autoOpenKeyboard: Boolean,
     doubleTapToLock: Boolean,
     showStatusBar: Boolean,
+    isAssistantEnabled: Boolean,
     isIntentionalPilotEnabled: Boolean,
     theme: ThemePreference,
     onShowDateChanged: (Boolean) -> Unit,
     onAutoOpenKeyboardChanged: (Boolean) -> Unit,
     onDoubleTapToLockChanged: (Boolean) -> Unit,
     onShowStatusBarChanged: (Boolean) -> Unit,
+    onAssistantEnabledChanged: (Boolean) -> Unit,
     onIntentionalPilotEnabledChanged: (Boolean) -> Unit,
     onSelectIntentionalPilotApps: () -> Unit,
     onThemeChanged: (ThemePreference) -> Unit,
@@ -86,6 +88,12 @@ fun SettingsScreen(
                     onCheckedChange = onShowStatusBarChanged,
                 )
 
+                PreferenceToggle(
+                    title = "Use assistant",
+                    subtitle = "Show the voice assistant on the home screen",
+                    checked = isAssistantEnabled,
+                    onCheckedChange = onAssistantEnabledChanged,
+                )
                 PreferenceToggle(
                     title = "Intentional Pilot",
                     subtitle = "Pause for 3 seconds to consider why you are opening distracting apps",

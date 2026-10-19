@@ -111,6 +111,9 @@ fun LauncherApp(
     var currentScreenName by rememberSaveable { mutableStateOf(LauncherScreen.HOME.name) }
     val currentScreen = LauncherScreen.valueOf(currentScreenName)
     val assistantExpansion = remember { mutableStateOf(false) }
+    LaunchedEffect(state.preferences.isAssistantEnabled) {
+        if (!state.preferences.isAssistantEnabled) assistantExpansion.value = false
+    }
     var homeSearchVisible by remember { mutableStateOf(false) }
     val searchAnimation = remember { Animatable(0f) }
     val searchScope = rememberCoroutineScope()
@@ -232,14 +235,16 @@ fun LauncherApp(
                                 searchProgress = searchProgress,
                                 gesturesEnabled = !returningHome && appPendingLaunch == null,
                                 assistantContent = { expansionState ->
-                                    com.example.minimallauncher.ui.assistant.HomeAssistant(
-                                        apps = state.apps,
-                                        deviceSearch = deviceSearch,
-                                        onLaunchApp = handleAppLaunch,
-                                        isActive = !searchPresent && !returningHome && currentScreen == LauncherScreen.HOME && appPendingLaunch == null,
-                                        homeRequest = homeRequest,
-                                        expansionState = expansionState,
-                                    )
+                                    if (state.preferences.isAssistantEnabled) {
+                                        com.example.minimallauncher.ui.assistant.HomeAssistant(
+                                            apps = state.apps,
+                                            deviceSearch = deviceSearch,
+                                            onLaunchApp = handleAppLaunch,
+                                            isActive = !searchPresent && !returningHome && currentScreen == LauncherScreen.HOME && appPendingLaunch == null,
+                                            homeRequest = homeRequest,
+                                            expansionState = expansionState,
+                                        )
+                                    }
                                 },
                             )
                             // Retain the overlay until its closing transition completes.
@@ -267,12 +272,14 @@ fun LauncherApp(
                             autoOpenKeyboard = state.preferences.autoOpenKeyboard,
                             doubleTapToLock = state.preferences.doubleTapToLock,
                             showStatusBar = state.preferences.showStatusBar,
+                            isAssistantEnabled = state.preferences.isAssistantEnabled,
                             isIntentionalPilotEnabled = state.preferences.isIntentionalPilotEnabled,
                             theme = state.preferences.theme,
                             onShowDateChanged = viewModel::setShowDate,
                             onAutoOpenKeyboardChanged = viewModel::setAutoOpenKeyboard,
                             onDoubleTapToLockChanged = viewModel::setDoubleTapToLock,
                             onShowStatusBarChanged = viewModel::setShowStatusBar,
+                            onAssistantEnabledChanged = viewModel::setAssistantEnabled,
                             onIntentionalPilotEnabledChanged = viewModel::setIntentionalPilotEnabled,
                             onSelectIntentionalPilotApps = { currentScreenName = LauncherScreen.INTENTIONAL_PILOT_APPS.name },
                             onThemeChanged = viewModel::setTheme,

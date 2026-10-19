@@ -50,6 +50,12 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         }
     }
 
+    override suspend fun setAssistantEnabled(enabled: Boolean) {
+        applicationContext.launcherDataStore.edit { values ->
+            values[ASSISTANT_ENABLED] = enabled
+        }
+    }
+
     override suspend fun setShowStatusBar(enabled: Boolean) {
         applicationContext.launcherDataStore.edit { values ->
             values[SHOW_STATUS_BAR] = enabled
@@ -110,6 +116,7 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
 
     private fun Preferences.toLauncherPreferences() = LauncherPreferences(
         showDate = this[SHOW_DATE] ?: true,
+        isAssistantEnabled = this[ASSISTANT_ENABLED] ?: true,
         autoOpenKeyboard = this[AUTO_OPEN_KEYBOARD] ?: true,
         doubleTapToLock = this[DOUBLE_TAP_TO_LOCK] ?: true,
         showStatusBar = this[SHOW_STATUS_BAR] ?: false,
@@ -123,6 +130,7 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
     )
 
     private companion object {
+        val ASSISTANT_ENABLED = booleanPreferencesKey("assistant_enabled")
         val SHOW_DATE = booleanPreferencesKey("show_date")
         val AUTO_OPEN_KEYBOARD = booleanPreferencesKey("auto_open_keyboard")
         val DOUBLE_TAP_TO_LOCK = booleanPreferencesKey("double_tap_to_lock")

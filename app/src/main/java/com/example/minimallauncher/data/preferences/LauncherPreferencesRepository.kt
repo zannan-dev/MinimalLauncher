@@ -8,6 +8,7 @@ interface LauncherPreferencesRepository {
     suspend fun setShowDate(enabled: Boolean)
     suspend fun setAutoOpenKeyboard(enabled: Boolean)
     suspend fun setDoubleTapToLock(enabled: Boolean)
+    suspend fun setAssistantEnabled(enabled: Boolean)
     suspend fun setShowStatusBar(enabled: Boolean)
     suspend fun setIntentionalPilotEnabled(enabled: Boolean)
     suspend fun setTheme(theme: ThemePreference)

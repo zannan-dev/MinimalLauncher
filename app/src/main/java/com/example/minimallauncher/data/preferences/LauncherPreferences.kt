@@ -11,6 +11,7 @@ data class LauncherPreferences(
     val favoriteAppOrder: List<String>,
     val isIntentionalPilotEnabled: Boolean,
     val intentionalPilotAppKeys: Set<String>,
+    val isAssistantEnabled: Boolean = true,
 )
 
 enum class ThemePreference {

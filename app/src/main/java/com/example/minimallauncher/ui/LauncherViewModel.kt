@@ -115,6 +115,12 @@ class LauncherViewModel(
         }
     }
 
+    fun setAssistantEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setAssistantEnabled(enabled)
+        }
+    }
+
     fun setShowStatusBar(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.setShowStatusBar(enabled)
