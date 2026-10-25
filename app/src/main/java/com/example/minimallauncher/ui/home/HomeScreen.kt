@@ -157,7 +157,7 @@ fun HomeScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(onOpenSearch, onOpenNotifications, assistantExpanded.value, searchVisible, gesturesEnabled) {
+            .pointerInput(onOpenSearch, assistantExpanded.value, searchVisible, gesturesEnabled) {
                 if (!gesturesEnabled || assistantExpanded.value || searchVisible) return@pointerInput
                 var drag = 0f
                 var handled = false
@@ -165,9 +165,9 @@ fun HomeScreen(
                 detectVerticalDragGestures(
                     onVerticalDrag = { _, amount ->
                         drag += amount
-                        if (!handled && (drag > threshold || drag < -threshold)) {
+                        if (!handled && drag > threshold) {
                             handled = true
-                            if (drag < 0f) onOpenSearch() else onOpenNotifications()
+                            onOpenSearch()
                         }
                     },
                     onDragEnd = { drag = 0f; handled = false },

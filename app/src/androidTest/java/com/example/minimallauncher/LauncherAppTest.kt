@@ -138,7 +138,7 @@ class LauncherAppTest {
         }
 
         composeRule.onNodeWithText("All apps").assertDoesNotExist()
-        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
         composeRule.onNodeWithText("All apps").performClick()
         composeRule.waitUntil(5_000) {
             ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
@@ -153,7 +153,7 @@ class LauncherAppTest {
             ?.isVisible(WindowInsetsCompat.Type.ime()) != true)
         composeRule.onNodeWithContentDescription("Close home search").performClick()
         composeRule.onNodeWithContentDescription("Current time").assertIsDisplayed()
-        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
         composeRule.onNodeWithText("All apps").assertIsDisplayed()
     }
 
@@ -165,7 +165,7 @@ class LauncherAppTest {
         composeRule.setContent {
             LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
         }
-        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
         val search = composeRule.onNodeWithTag("Home search")
         composeRule.onNodeWithText("All apps").assertIsDisplayed()
         search.performTextInput("App 30")
@@ -223,7 +223,7 @@ class LauncherAppTest {
         fun keyboardVisible() = ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
             ?.isVisible(WindowInsetsCompat.Type.ime()) == true
 
-        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
         val search = composeRule.onNodeWithTag("Home search")
         search.assertIsFocused()
         composeRule.waitUntil(5_000) { keyboardVisible() }
@@ -254,7 +254,7 @@ class LauncherAppTest {
 
         composeRule.onNodeWithContentDescription("Close home search").performClick()
         composeRule.onNodeWithContentDescription("Current time").assertIsDisplayed()
-        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
         search.assertIsFocused()
         composeRule.waitUntil(5_000) { keyboardVisible() }
     }
@@ -269,13 +269,13 @@ class LauncherAppTest {
         composeRule.setContent {
             LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
         }
-        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
         composeRule.onNode(hasSetTextAction()).performTextInput("cam")
         composeRule.onNodeWithText("Camera").performClick()
         composeRule.onNodeWithText("Do you need to open Camera?").assertIsDisplayed()
         Espresso.pressBack()
         composeRule.onNodeWithContentDescription("Current time").assertIsDisplayed()
-        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
         composeRule.onNodeWithText("Search apps...").assertIsDisplayed()
     }
 
@@ -293,7 +293,7 @@ class LauncherAppTest {
             ?.isVisible(WindowInsetsCompat.Type.ime()) == true
 
         repeat(2) {
-            composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+            composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
             composeRule.onNode(hasSetTextAction()).performTextReplacement("cam")
             composeRule.onNodeWithText("Camera").performClick()
             // Emulate leaving for the result, then receiving Home while stopped.
@@ -310,7 +310,7 @@ class LauncherAppTest {
     }
 
     @Test
-    fun downwardSwipeOnHomeOpensStatusBarWithoutSearch() {
+    fun upwardSwipeOnHomeDoesNothing() {
         val app = LaunchableApp("favorite", "Activity", "Favorite", Process.myUserHandle(), false)
         val viewModel = LauncherViewModel(
             applicationsRepository = TestApplicationsRepository(listOf(app)),
@@ -322,16 +322,16 @@ class LauncherAppTest {
                 onOpenNotifications = { openCount++ })
         }
         composeRule.onRoot().performTouchInput {
-            swipe(center, Offset(center.x, height * 0.8f))
+            swipe(center, Offset(center.x, height * 0.2f))
         }
-        composeRule.runOnIdle { assertEquals(1, openCount) }
+        composeRule.runOnIdle { assertEquals(0, openCount) }
         composeRule.onNodeWithContentDescription("Close home search").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Favorite Favorite").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Voice assistant").assertIsDisplayed()
     }
 
     @Test
-    fun upwardSwipeOnHomeOpensFocusedSearchInsteadOfNotifications() {
+    fun downwardSwipeOnHomeOpensFocusedSearchInsteadOfNotifications() {
         val viewModel = LauncherViewModel(
             applicationsRepository = TestApplicationsRepository(),
             preferencesRepository = TestPreferencesRepository(),
@@ -346,7 +346,7 @@ class LauncherAppTest {
         }
 
         composeRule.onRoot().performTouchInput {
-            swipe(center, Offset(center.x, height * 0.2f))
+            swipe(center, Offset(center.x, height * 0.8f))
         }
         composeRule.runOnIdle { assertEquals(0, openCount) }
         composeRule.onNodeWithTag("Home search").assertIsFocused()
@@ -355,7 +355,7 @@ class LauncherAppTest {
     }
 
     @Test
-    fun upwardSwipeWithFavoritesSearchesAndRestoresHome() {
+    fun downwardSwipeWithFavoritesSearchesAndRestoresHome() {
         val app = LaunchableApp("favorite", "Activity", "Favorite", Process.myUserHandle(), false)
         val viewModel = LauncherViewModel(
             applicationsRepository = TestApplicationsRepository(listOf(app)),
@@ -372,7 +372,7 @@ class LauncherAppTest {
 
         composeRule.onNodeWithContentDescription("Favorite Favorite").assertIsDisplayed()
         composeRule.onRoot().performTouchInput {
-            swipe(center, Offset(center.x, height * 0.2f))
+            swipe(center, Offset(center.x, height * 0.8f))
         }
         composeRule.runOnIdle { assertEquals(0, openCount) }
         composeRule.onNodeWithTag("Home search").assertIsFocused()
@@ -400,7 +400,7 @@ class LauncherAppTest {
         val restingCenter = ring.fetchSemanticsNode().boundsInRoot.center
         var searchCenter: Offset? = null
         repeat(4) {
-            composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+            composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
             val pill = composeRule.onNodeWithTag("Home search")
             pill.assertIsFocused()
             composeRule.waitUntil(5_000) {
@@ -427,7 +427,7 @@ class LauncherAppTest {
             LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
         }
         // Learn the real keyboard position, then reopen without a settling delay.
-        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
         composeRule.waitUntil(5_000) {
             ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
                 ?.isVisible(WindowInsetsCompat.Type.ime()) == true
@@ -438,7 +438,7 @@ class LauncherAppTest {
         composeRule.onNodeWithTag("Home search").assertDoesNotExist()
         composeRule.mainClock.autoAdvance = false
         try {
-            composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+            composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
             composeRule.mainClock.advanceTimeBy(96)
             val pill = composeRule.onNodeWithTag("Home search")
             val initial = pill.fetchSemanticsNode().boundsInRoot
@@ -469,7 +469,7 @@ class LauncherAppTest {
             LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
         }
         composeRule.onNodeWithText("All apps").assertDoesNotExist()
-        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
         composeRule.waitUntil(5_000) {
             ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
                 ?.isVisible(WindowInsetsCompat.Type.ime()) == true
@@ -512,7 +512,7 @@ class LauncherAppTest {
         }
         fun openSearch() {
             composeRule.onRoot().performTouchInput {
-                swipe(center, Offset(center.x, height * 0.2f))
+                swipe(center, Offset(center.x, height * 0.8f))
             }
             composeRule.onNodeWithTag("Home search").assertIsFocused()
         }
@@ -558,7 +558,7 @@ class LauncherAppTest {
         }
         repeat(2) { attempt ->
             composeRule.onRoot().performTouchInput {
-                swipe(center, Offset(center.x, height * 0.2f))
+                swipe(center, Offset(center.x, height * 0.8f))
             }
             composeRule.onNodeWithContentDescription("Close home search").assertIsDisplayed()
             composeRule.runOnUiThread {
@@ -612,7 +612,7 @@ class LauncherAppTest {
         }
 
         composeRule.onNodeWithText("All apps").assertDoesNotExist()
-        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.2f)) }
+        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
         composeRule.onNodeWithText("All apps").performClick()
         composeRule.waitUntil(5_000) {
             ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
