@@ -187,16 +187,14 @@ fun LauncherApp(
     }
 
     LauncherTheme(preference = state.preferences.theme) {
-        val background = if (currentScreen == LauncherScreen.HOME && appPendingLaunch == null) {
-            Color.Black
-        } else {
-            MaterialTheme.colorScheme.surface
-        }
+        val background = MaterialTheme.colorScheme.surface
         SideEffect {
             val window = (view.context as? Activity)?.window
             if (window != null) {
-                WindowInsetsControllerCompat(window, view).isAppearanceLightNavigationBars =
-                    background.luminance() > 0.5f
+                val controller = WindowInsetsControllerCompat(window, view)
+                val isLight = background.luminance() > 0.5f
+                controller.isAppearanceLightNavigationBars = isLight
+                controller.isAppearanceLightStatusBars = isLight
             }
         }
         Surface(modifier = Modifier.fillMaxSize(), color = background) {

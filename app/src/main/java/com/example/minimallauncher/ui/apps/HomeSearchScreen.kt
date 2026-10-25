@@ -455,8 +455,8 @@ fun HomeSearchScreen(
                 .graphicsLayer { alpha = if (animateFromHome) LauncherMotion.reveal(homePresence) else 1f }
                 .background(Brush.verticalGradient(
                     0f to Color.Transparent,
-                    0.45f to Color.Black.copy(alpha = 0.12f),
-                    1f to Color.Black.copy(alpha = 0.5f),
+                    0.45f to MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                    1f to MaterialTheme.colorScheme.surface,
                 )),
         )
         if (animateFromHome) {

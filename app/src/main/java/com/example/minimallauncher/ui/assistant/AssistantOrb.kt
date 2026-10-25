@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
@@ -18,6 +19,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import com.example.minimallauncher.R
@@ -54,14 +56,28 @@ fun AssistantOrb(
     Box(Modifier.size(diameter).graphicsLayer { scaleX = scale; scaleY = scale }
         .semantics { contentDescription = description }
         .clickable(enabled = enabled, role = Role.Button, interactionSource = interaction, indication = null, onClick = onClick)) {
-        // Map the green artwork's intensity to white without changing its texture or contours.
-        val monochrome = remember {
-            ColorFilter.colorMatrix(ColorMatrix(floatArrayOf(
-                0f, 1f, 0f, 0f, 0f,
-                0f, 1f, 0f, 0f, 0f,
-                0f, 1f, 0f, 0f, 0f,
-                0f, 0f, 0f, 1f, 0f,
-            )))
+        val surface = MaterialTheme.colorScheme.surface
+        val onSurface = MaterialTheme.colorScheme.onSurface
+        val isLight = surface.luminance() > 0.5f
+        val monochrome = remember(surface, onSurface, isLight) {
+            if (isLight) {
+                val dr = onSurface.red - surface.red
+                val dg = onSurface.green - surface.green
+                val db = onSurface.blue - surface.blue
+                ColorFilter.colorMatrix(ColorMatrix(floatArrayOf(
+                    0f, dr, 0f, 0f, surface.red * 255f,
+                    0f, dg, 0f, 0f, surface.green * 255f,
+                    0f, db, 0f, 0f, surface.blue * 255f,
+                    0f, 0f, 0f, 1f, 0f,
+                )))
+            } else {
+                ColorFilter.colorMatrix(ColorMatrix(floatArrayOf(
+                    0f, 1f, 0f, 0f, 0f,
+                    0f, 1f, 0f, 0f, 0f,
+                    0f, 1f, 0f, 0f, 0f,
+                    0f, 0f, 0f, 1f, 0f,
+                )))
+            }
         }
         Image(
             painter = painterResource(R.drawable.assistant_ring),

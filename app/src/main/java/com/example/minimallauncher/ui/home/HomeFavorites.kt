@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -49,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
@@ -92,10 +94,21 @@ fun HomeFavorites(
         LauncherMotion.settle(), label = "Removal attraction")
     val iconTilt by animateFloatAsState(if (overTrash) -10f else 0f,
         LauncherMotion.settle(), label = "Removal tilt")
-    val targetBackground by animateColorAsState(if (overTrash) Color(0xFF321B1B) else Color(0xFF161616),
-        LauncherMotion.color(), label = "Removal surface")
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val targetBackground by animateColorAsState(
+        if (overTrash) {
+            if (isDark) Color(0xFF321B1B) else Color(0xFFFDE8E8)
+        } else {
+            if (isDark) Color(0xFF161616) else MaterialTheme.colorScheme.surfaceVariant
+        },
+        LauncherMotion.color(), label = "Removal surface"
+    )
     val trashColor by animateColorAsState(
-        if (overTrash) Color(0xFFFFB1B1) else Color.White,
+        if (overTrash) {
+            if (isDark) Color(0xFFFFB1B1) else Color(0xFFBA1A1A)
+        } else {
+            if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+        },
         LauncherMotion.color(), label = "Removal target",
     )
     LaunchedEffect(overTrash) {
@@ -199,7 +212,7 @@ fun HomeFavorites(
                             .semantics { contentDescription = "Favorite ${app.label}" },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(app.label, fontSize = 18.sp, color = Color.White)
+                        Text(app.label, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
                     }
             }
         }
@@ -253,7 +266,7 @@ fun HomeFavorites(
                     .heightIn(min = 48.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(draggedApp.label, fontSize = 18.sp, color = Color.White)
+                Text(draggedApp.label, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
             }
         }
     }

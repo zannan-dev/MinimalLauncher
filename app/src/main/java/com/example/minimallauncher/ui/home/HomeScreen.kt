@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -156,7 +157,6 @@ fun HomeScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
             .pointerInput(onOpenSearch, onOpenNotifications, assistantExpanded.value, searchVisible, gesturesEnabled) {
                 if (!gesturesEnabled || assistantExpanded.value || searchVisible) return@pointerInput
                 var drag = 0f
@@ -207,7 +207,7 @@ fun HomeScreen(
                     text = now.format(timeFormatter),
                     fontSize = 25.sp,
                     lineHeight = 32.sp,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.semantics { contentDescription = "Current time" },
                 )
                 AnimatedVisibility(
@@ -220,7 +220,7 @@ fun HomeScreen(
                         Text(
                             text = dateText,
                             fontSize = 13.sp,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onBackground,
                         )
                     }
                 }
@@ -231,7 +231,7 @@ fun HomeScreen(
                         "Set as default launcher",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Normal,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onBackground,
                         textDecoration = TextDecoration.Underline,
                         modifier = Modifier.clickable(enabled = !assistantExpanded.value && !searchVisible, onClick = onSetDefaultLauncher),
                     )
@@ -340,11 +340,11 @@ fun BatteryStatus() {
                 Icon(
                     imageVector = Icons.Filled.Bolt,
                     contentDescription = "Charging",
-                    tint = Color.White,
+                    tint = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.padding(end = 4.dp).size(16.dp),
                 )
             }
-            Text(text = "${batteryPct.toInt()}%", fontSize = 14.sp, color = Color.White)
+            Text(text = "${batteryPct.toInt()}%", fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground)
         }
     }
 }
