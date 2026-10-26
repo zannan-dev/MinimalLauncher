@@ -1,5 +1,7 @@
 package com.example.minimallauncher.data.preferences
 
+import com.example.minimallauncher.domain.RecentSearchResult
+import com.example.minimallauncher.domain.withRecentResult
 import android.content.Context
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -30,6 +32,17 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         .map { values ->
             values.toLauncherPreferences()
         }
+
+    override suspend fun recordRecentSearchResult(result: RecentSearchResult) {
+        applicationContext.launcherDataStore.edit { values ->
+            val updated = decodeRecentSearchResults(values[RECENT_SEARCH_RESULTS]).withRecentResult(result)
+            values[RECENT_SEARCH_RESULTS] = encodeRecentSearchResults(updated)
+        }
+    }
+
+    override suspend fun clearRecentSearchResults() {
+        applicationContext.launcherDataStore.edit { it.remove(RECENT_SEARCH_RESULTS) }
+    }
 
     override suspend fun setShowDate(enabled: Boolean) {
         applicationContext.launcherDataStore.edit { values ->
@@ -84,6 +97,7 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
     }
 
     private fun Preferences.toLauncherPreferences() = LauncherPreferences(
+        recentSearchResults = decodeRecentSearchResults(this[RECENT_SEARCH_RESULTS]),
         showDate = this[SHOW_DATE] ?: true,
         autoOpenKeyboard = this[AUTO_OPEN_KEYBOARD] ?: true,
         theme = ThemePreference.fromStorage(this[THEME]),
@@ -94,6 +108,7 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
     )
 
     private companion object {
+        val RECENT_SEARCH_RESULTS = stringPreferencesKey("recent_search_results")
         val SHOW_DATE = booleanPreferencesKey("show_date")
         val AUTO_OPEN_KEYBOARD = booleanPreferencesKey("auto_open_keyboard")
         val THEME = stringPreferencesKey("theme")

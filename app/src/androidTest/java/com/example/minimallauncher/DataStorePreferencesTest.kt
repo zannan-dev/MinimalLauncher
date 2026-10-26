@@ -1,5 +1,6 @@
 package com.example.minimallauncher
 
+import com.example.minimallauncher.domain.RecentSearchResult
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.minimallauncher.data.preferences.DataStoreLauncherPreferencesRepository
@@ -12,6 +13,29 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class DataStorePreferencesTest {
+    @Test
+    fun recentsPersistAndClearWithoutChangingOtherPreferences() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = DataStoreLauncherPreferencesRepository(context)
+        val original = repository.preferences.first()
+        try {
+            repository.clearRecentSearchResults()
+            assertEquals(emptyList<RecentSearchResult>(), repository.preferences.first().recentSearchResults)
+            val contact = RecentSearchResult.Contact("content://com.android.contacts/contacts/lookup/test/1", "Recent test")
+            repository.recordRecentSearchResult(RecentSearchResult.App("test-app"))
+            repository.recordRecentSearchResult(contact)
+            repository.recordRecentSearchResult(RecentSearchResult.App("test-app"))
+            val restored = DataStoreLauncherPreferencesRepository(context).preferences.first()
+            assertEquals(listOf(RecentSearchResult.App("test-app"), contact), restored.recentSearchResults)
+            assertEquals(original.copy(recentSearchResults = restored.recentSearchResults), restored)
+            repository.clearRecentSearchResults()
+            assertEquals(original.copy(recentSearchResults = emptyList()), repository.preferences.first())
+        } finally {
+            repository.clearRecentSearchResults()
+            original.recentSearchResults.asReversed().forEach { repository.recordRecentSearchResult(it) }
+        }
+    }
+
     @Test
     fun settingsPersistWhenRepositoryIsRecreated() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

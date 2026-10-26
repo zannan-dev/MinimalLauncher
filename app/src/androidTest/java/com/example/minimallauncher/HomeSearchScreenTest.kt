@@ -54,7 +54,7 @@ class HomeSearchScreenTest {
                     failedToLoad = false,
                     favoriteKeys = emptySet(),
                     onBack = {},
-                    onLaunchApp = { app -> launched = app },
+                    onLaunchApp = { app -> launched = app; true },
                     onToggleFavorite = {},
                 )
             }
@@ -179,7 +179,7 @@ class HomeSearchScreenTest {
                     failedToLoad = false,
                     favoriteKeys = emptySet(),
                     onBack = {},
-                    onLaunchApp = onLaunchApp,
+                    onLaunchApp = { onLaunchApp(it); true },
                     onToggleFavorite = {},
                 )
             }
@@ -218,7 +218,7 @@ class HomeSearchScreenTest {
                     failedToLoad = false,
                     favoriteKeys = emptySet(),
                     onBack = {},
-                    onLaunchApp = {},
+                    onLaunchApp = { true },
                     onToggleFavorite = { favorite = it },
                 )
             }

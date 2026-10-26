@@ -42,6 +42,8 @@ import com.example.minimallauncher.data.apps.ApplicationsRepository
 import com.example.minimallauncher.data.preferences.LauncherPreferences
 import com.example.minimallauncher.data.preferences.LauncherPreferencesRepository
 import com.example.minimallauncher.data.preferences.ThemePreference
+import com.example.minimallauncher.domain.RecentSearchResult
+import com.example.minimallauncher.domain.withRecentResult
 import com.example.minimallauncher.domain.LaunchableApp
 import com.example.minimallauncher.ui.LauncherApp
 import com.example.minimallauncher.ui.LauncherViewModel
@@ -62,6 +64,32 @@ class LauncherAppTest {
             composeRule.activity.enableEdgeToEdge()
             composeRule.activity.window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         }
+    }
+
+    @Test
+    fun homeFavoritesAreExcludedAndTypedSearchHistoryCanBeReopenedAndCleared() {
+        val app = LaunchableApp("camera", "Activity", "Camera", Process.myUserHandle(), false)
+        val viewModel = LauncherViewModel(TestApplicationsRepository(listOf(app)),
+            TestPreferencesRepository(favorites = listOf(app.key)))
+        composeRule.setContent {
+            LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
+        }
+        composeRule.onNodeWithContentDescription("Favorite Camera").performClick()
+        composeRule.runOnIdle { assertTrue(viewModel.uiState.value.preferences.recentSearchResults.isEmpty()) }
+        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
+        composeRule.onNodeWithTag("Home search").performTextInput("cam")
+        composeRule.onNodeWithText("Camera").performClick()
+        composeRule.runOnIdle {
+            assertEquals(listOf(RecentSearchResult.App(app.key)), viewModel.uiState.value.preferences.recentSearchResults)
+            viewModel.onHomePressed()
+        }
+        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
+        composeRule.onNodeWithText("Recent").assertIsDisplayed()
+        composeRule.onNodeWithTag("Home search").assertIsFocused()
+        composeRule.onNodeWithText("Camera").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Clear recent searches").performClick()
+        composeRule.onNodeWithText("Recent").assertDoesNotExist()
+        composeRule.runOnIdle { assertTrue(viewModel.uiState.value.preferences.recentSearchResults.isEmpty()) }
     }
 
     @Test
@@ -610,6 +638,12 @@ private class TestPreferencesRepository(
     )
     override val preferences: Flow<LauncherPreferences> = state
 
+    override suspend fun recordRecentSearchResult(result: RecentSearchResult) {
+        state.value = state.value.copy(recentSearchResults = state.value.recentSearchResults.withRecentResult(result))
+    }
+    override suspend fun clearRecentSearchResults() {
+        state.value = state.value.copy(recentSearchResults = emptyList())
+    }
     override suspend fun setShowDate(enabled: Boolean) = Unit
     override suspend fun setAutoOpenKeyboard(enabled: Boolean) = Unit
     override suspend fun setTheme(theme: ThemePreference) = Unit

@@ -1,5 +1,6 @@
 package com.example.minimallauncher
 
+import com.example.minimallauncher.domain.RecentSearchResult
 import android.os.Process
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -24,14 +25,13 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
 class UnifiedSearchTest {
     @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
 
-    @Test fun firstContactOnlyResultsAnimateIntoView() {
+    @Test fun firstContactOnlyResultHasNoForcedSlide() {
         val gate = CompletableDeferred<Unit>()
         val search = object : DeviceSearchRepository {
             override fun settings(query: String) = emptyList<DeviceSearchResult>()
@@ -39,6 +39,7 @@ class UnifiedSearchTest {
                 gate.await()
                 return listOf(DeviceSearchResult("contact:first", "First contact", "Contact", "view"))
             }
+            override suspend fun resolveRecent(result: RecentSearchResult): DeviceSearchResult? = null
             override fun open(result: DeviceSearchResult) = true
         }
         composeRule.setContent {
@@ -46,7 +47,7 @@ class UnifiedSearchTest {
                 HomeSearchScreen(
                     apps = emptyList(), listState = rememberLazyListState(), autoOpenKeyboard = false,
                     isLoading = false, failedToLoad = false, favoriteKeys = emptySet(),
-                    onBack = {}, onLaunchApp = {}, onToggleFavorite = {},
+                    onBack = {}, onLaunchApp = { true }, onToggleFavorite = {},
                     deviceSearch = search, contactsAllowed = true,
                 )
             }
@@ -68,11 +69,70 @@ class UnifiedSearchTest {
             composeRule.mainClock.advanceTimeBy(1_000)
             composeRule.waitForIdle()
             val end = contact.fetchSemanticsNode().boundsInRoot.top
-            assertTrue("First contacts must animate, rather than pop in: $start, $during, $end",
-                start > during && during > end + 1f)
+            assertEquals("A single contact should not slide on screen", start, during, 1f)
+            assertEquals("A single contact should stay at its final position", start, end, 1f)
         } finally {
             composeRule.mainClock.autoAdvance = true
         }
+    }
+
+    @Test fun unchangedContactAndSettingStayMountedWhileRefiningASearch() {
+        var gate = CompletableDeferred<Unit>().apply { complete(Unit) }
+        var completedQuery = ""
+        val alex = DeviceSearchResult("contact:alex", "Alex", "Contact", "view")
+        val alarm = DeviceSearchResult("settings:alarm", "Alarm", "Phone settings", "settings")
+        val search = object : DeviceSearchRepository {
+            override fun settings(query: String) = if (query.startsWith("a")) listOf(alarm) else emptyList()
+            override suspend fun contacts(query: String): List<DeviceSearchResult> {
+                gate.await()
+                completedQuery = query
+                return if (query.startsWith("a")) listOf(alex) else emptyList()
+            }
+            override suspend fun resolveRecent(result: RecentSearchResult): DeviceSearchResult? = null
+            override fun open(result: DeviceSearchResult) = true
+        }
+        composeRule.setContent {
+            LauncherTheme(ThemePreference.LIGHT) {
+                HomeSearchScreen(
+                    apps = emptyList(), listState = rememberLazyListState(), autoOpenKeyboard = false,
+                    isLoading = false, failedToLoad = false, favoriteKeys = emptySet(),
+                    onBack = {}, onLaunchApp = { true }, onToggleFavorite = {},
+                    deviceSearch = search, contactsAllowed = true,
+                )
+            }
+        }
+        composeRule.onNode(hasSetTextAction()).performTextInput("a")
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(androidx.compose.ui.test.hasText("Alex")).fetchSemanticsNodes().isNotEmpty()
+        }
+        val contact = composeRule.onNodeWithText("Alex")
+        val setting = composeRule.onNodeWithText("Alarm")
+        val contactTop = contact.fetchSemanticsNode().boundsInRoot.top
+        val settingTop = setting.fetchSemanticsNode().boundsInRoot.top
+        composeRule.runOnIdle { gate = CompletableDeferred() }
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("al")
+        contact.assertIsDisplayed()
+        setting.assertIsDisplayed()
+        assertEquals(contactTop, contact.fetchSemanticsNode().boundsInRoot.top, 1f)
+        assertEquals(settingTop, setting.fetchSemanticsNode().boundsInRoot.top, 1f)
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.runOnIdle { gate.complete(Unit) }
+            composeRule.waitUntil(5_000) {
+                composeRule.mainClock.advanceTimeByFrame()
+                completedQuery == "al"
+            }
+            composeRule.mainClock.advanceTimeBy(64)
+            composeRule.waitForIdle()
+            assertEquals(contactTop, contact.fetchSemanticsNode().boundsInRoot.top, 1f)
+            assertEquals(settingTop, setting.fetchSemanticsNode().boundsInRoot.top, 1f)
+        } finally { composeRule.mainClock.autoAdvance = true }
+        // A different query must hide old contacts immediately, without waiting for the provider.
+        composeRule.runOnIdle { gate = CompletableDeferred() }
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("zz")
+        contact.assertDoesNotExist()
+        setting.assertDoesNotExist()
+        gate.complete(Unit)
     }
 
     @Test fun newQueryAndDelayedContactsResetPartiallyScrolledResults() {
@@ -85,6 +145,7 @@ class UnifiedSearchTest {
                 gate.await()
                 return listOf(DeviceSearchResult("contact:first", "First contact", "Contact", "view"))
             }
+            override suspend fun resolveRecent(result: RecentSearchResult): DeviceSearchResult? = null
             override fun open(result: DeviceSearchResult) = true
         }
         composeRule.setContent {
@@ -92,7 +153,7 @@ class UnifiedSearchTest {
                 HomeSearchScreen(
                     apps = emptyList(), listState = listState, autoOpenKeyboard = false,
                     isLoading = false, failedToLoad = false, favoriteKeys = emptySet(),
-                    onBack = {}, onLaunchApp = {}, onToggleFavorite = {},
+                    onBack = {}, onLaunchApp = { true }, onToggleFavorite = {},
                     deviceSearch = search, contactsAllowed = true,
                 )
             }
@@ -138,6 +199,7 @@ class UnifiedSearchTest {
             delay(if (query == "cam") 200 else 10)
             return listOf(DeviceSearchResult("contact:$query", if (query == "cam") "Camila" else "Other person", "Contact", "view"))
         }
+        override suspend fun resolveRecent(result: RecentSearchResult): DeviceSearchResult? = null
         override fun open(result: DeviceSearchResult): Boolean { opened = result; return true }
     }
 
@@ -148,7 +210,7 @@ class UnifiedSearchTest {
                     apps = listOf(LaunchableApp("camera", "Activity", "Camera", Process.myUserHandle(), false)),
                     listState = rememberLazyListState(), autoOpenKeyboard = false,
                     isLoading = false, failedToLoad = false, favoriteKeys = emptySet(),
-                    onBack = {}, onLaunchApp = {}, onToggleFavorite = {},
+                    onBack = {}, onLaunchApp = { true }, onToggleFavorite = {},
                     deviceSearch = search, contactsAllowed = allowed.value, contactsRevision = revision.value, onRequestContacts = request,
                 )
             }

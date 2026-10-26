@@ -1,5 +1,6 @@
 package com.example.minimallauncher.ui
 
+import com.example.minimallauncher.domain.RecentSearchResult
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -76,6 +77,14 @@ class LauncherViewModel(
     }
 
     fun launchApp(app: LaunchableApp): Boolean = applicationsRepository.launchApp(app)
+
+    fun recordRecentSearchResult(result: RecentSearchResult) {
+        viewModelScope.launch { preferencesRepository.recordRecentSearchResult(result) }
+    }
+
+    fun clearRecentSearchResults() {
+        viewModelScope.launch { preferencesRepository.clearRecentSearchResults() }
+    }
 
     fun toggleFavorite(app: LaunchableApp) {
         viewModelScope.launch {

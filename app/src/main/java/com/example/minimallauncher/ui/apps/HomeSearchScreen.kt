@@ -2,12 +2,16 @@ package com.example.minimallauncher.ui.apps
 
 import com.example.minimallauncher.data.search.DeviceSearchRepository
 import com.example.minimallauncher.domain.DeviceSearchResult
+import com.example.minimallauncher.domain.RecentSearchResult
+import com.example.minimallauncher.domain.asRecentResult
+import com.example.minimallauncher.domain.normalizeForSearch
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import android.widget.Toast
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.fadeIn
@@ -64,6 +68,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -91,6 +97,7 @@ import android.provider.Settings
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -121,7 +128,7 @@ fun HomeSearchScreen(
     failedToLoad: Boolean,
     favoriteKeys: Set<String>,
     onBack: () -> Unit,
-    onLaunchApp: (LaunchableApp) -> Unit,
+    onLaunchApp: (LaunchableApp) -> Boolean,
     onToggleFavorite: (LaunchableApp) -> Unit,
     isActive: Boolean = true,
     homeRequest: Long = 0L,
@@ -136,6 +143,9 @@ fun HomeSearchScreen(
     focusOnOpen: Boolean = autoOpenKeyboard,
     previousKeyboardBottom: Int = 0,
     onKeyboardPosition: (Int) -> Unit = {},
+    recentResults: List<RecentSearchResult> = emptyList(),
+    onRecordRecentResult: (RecentSearchResult) -> Unit = {},
+    onClearRecentResults: () -> Unit = {},
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val filteredApps = remember(apps, query, animateFromHome, showAllApps) {
@@ -146,13 +156,67 @@ fun HomeSearchScreen(
     val matchingSettings = remember(deviceSearch, query) { deviceSearch?.settings(query).orEmpty() }
     var contactQuery by remember { mutableStateOf("") }
     var contactResults by remember { mutableStateOf(emptyList<DeviceSearchResult>()) }
+    var completedSettingsKeys by remember { mutableStateOf(emptySet<String>()) }
     var contactsLoading by remember { mutableStateOf(false) }
     var contactsFailed by remember { mutableStateOf(false) }
-    val visibleContacts = if (contactsAllowed && contactQuery == query) contactResults else emptyList()
-    // Publish settings alongside contacts for this query, so late contacts don't
-    // insert above settings that the user has already started reading.
-    val settingsResults = if (!contactsAllowed || contactQuery == query) matchingSettings else emptyList()
-    val resultsVersion = remember(query, showAllApps, filteredApps, visibleContacts, settingsResults, contactsAllowed, contactsFailed) { Any() }
+    val visibleContacts = remember(contactsAllowed, contactQuery, query, contactResults) {
+        when {
+            !contactsAllowed || query.isBlank() -> emptyList()
+            contactQuery == query -> contactResults
+            else -> {
+                // Keep known matches mounted during a refined lookup. Their keys stay
+                // stable, so the same contact doesn't disappear and animate back in.
+                val needle = query.normalizeForSearch()
+                contactResults.filter { result ->
+                    needle.isNotEmpty() && (result.title.normalizeForSearch().contains(needle, ignoreCase = true) ||
+                        (result.detail != "Contact" && result.detail.normalizeForSearch().contains(needle, ignoreCase = true)))
+                }
+            }
+        }
+    }
+    // Keep existing settings that still match; publish newly matched settings
+    // alongside the completed contact lookup, avoiding a second reveal.
+    val settingsResults = if (!contactsAllowed || contactQuery == query) matchingSettings
+        else matchingSettings.filter { it.key in completedSettingsKeys }
+    val showRecents = animateFromHome && query.isBlank() && !showAllApps
+    val recentRequest = remember(recentResults, contactsAllowed, contactsRevision, deviceSearch, showRecents) { Any() }
+    var resolvedRecentDevices by remember { mutableStateOf<Pair<Any, Map<String, DeviceSearchResult>>?>(null) }
+    LaunchedEffect(showRecents, isActive, recentRequest) {
+        if (!showRecents || !isActive) return@LaunchedEffect
+        val resolved = mutableMapOf<String, DeviceSearchResult>()
+        recentResults.forEach { recent ->
+            if (recent !is RecentSearchResult.App && (recent !is RecentSearchResult.Contact || contactsAllowed)) {
+                try {
+                    deviceSearch?.resolveRecent(recent)?.let { resolved[recent.identity] = it }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // An unavailable destination should not prevent other recents from opening.
+                }
+            }
+        }
+        currentCoroutineContext().ensureActive()
+        resolvedRecentDevices = recentRequest to resolved
+    }
+    val recentDevices = resolvedRecentDevices?.takeIf { it.first === recentRequest }?.second.orEmpty()
+    val visibleRecents = remember(recentResults, apps, recentDevices, contactsAllowed) {
+        val appsByKey = apps.associateBy { it.key }
+        recentResults.mapNotNull { recent ->
+            when (recent) {
+                is RecentSearchResult.App -> appsByKey[recent.appKey]?.let {
+                    ResolvedRecentResult(recent, it.label, "App", app = it)
+                }
+                is RecentSearchResult.Contact -> if (!contactsAllowed) null else recentDevices[recent.identity]?.let {
+                    ResolvedRecentResult(recent, it.title, "Contact", device = it)
+                }
+                is RecentSearchResult.Setting -> recentDevices[recent.identity]?.let {
+                    ResolvedRecentResult(recent, it.title, "Setting", device = it)
+                }
+            }
+        }
+    }
+    val latestRecent = if (showRecents) visibleRecents.firstOrNull() else null
+    val resultsVersion = remember(query, showAllApps, filteredApps, visibleContacts, settingsResults, contactsAllowed, contactsFailed, visibleRecents) { Any() }
     val scrollReset = remember(listState) { SearchResultsScrollReset() }
     SideEffect {
         if (scrollReset.appliedVersion !== resultsVersion) {
@@ -169,10 +233,11 @@ fun HomeSearchScreen(
         contactsLoading = false
         if (!contactsAllowed || query.isBlank() || deviceSearch == null) {
             contactResults = emptyList()
+            completedSettingsKeys = emptySet()
             contactQuery = query
         } else if (isActive) {
-            // Keep completed matches during a refresh of the same query. Old-query results
-            // stay hidden until this request completes, so typing never reveals stale contacts.
+            // Locally confirmed matches remain visible while the provider completes
+            // this query. Nonmatching old rows are filtered out immediately.
             contactsLoading = true
             try {
                 delay(120)
@@ -185,6 +250,7 @@ fun HomeSearchScreen(
                 contactQuery = query
                 contactsFailed = true
             }
+            completedSettingsKeys = matchingSettings.map { it.key }.toSet()
             contactsLoading = false
         }
     }
@@ -227,24 +293,39 @@ fun HomeSearchScreen(
             keyboardController?.hide()
         }
     }
-    val launchApp: (LaunchableApp) -> Unit = { app ->
-        resumeSearchOnReturn = query.isNotBlank()
+    fun launchAppResult(app: LaunchableApp, recordRecent: Boolean = query.isNotBlank()) {
+        resumeSearchOnReturn = query.isNotBlank() || showRecents
         launchHomeRequest = homeRequest
         leftForSearchResult = false
         dismissSearch()
-        onLaunchApp(app)
+        if (onLaunchApp(app)) {
+            if (recordRecent) onRecordRecentResult(RecentSearchResult.App(app.key))
+        } else {
+            resumeSearchOnReturn = false
+            focusOnEntry = query.isNotBlank() || showRecents
+            Toast.makeText(context, "Could not open ${app.label}", Toast.LENGTH_SHORT).show()
+        }
     }
+    val launchApp: (LaunchableApp) -> Unit = { launchAppResult(it) }
 
-    val launchDeviceResult: (DeviceSearchResult) -> Unit = { result ->
-        resumeSearchOnReturn = query.isNotBlank()
+    fun launchDeviceResult(result: DeviceSearchResult, recordRecent: Boolean = query.isNotBlank()) {
+        resumeSearchOnReturn = query.isNotBlank() || showRecents
         launchHomeRequest = homeRequest
         leftForSearchResult = false
         dismissSearch()
         if (deviceSearch?.open(result) != true) {
             resumeSearchOnReturn = false
-            focusOnEntry = query.isNotBlank()
+            focusOnEntry = query.isNotBlank() || showRecents
             Toast.makeText(context, "Could not open ${result.title}", Toast.LENGTH_SHORT).show()
+        } else if (recordRecent) {
+            onRecordRecentResult(result.asRecentResult())
         }
+    }
+
+    fun launchRecentResult(recent: ResolvedRecentResult) {
+        if (!isActive) return
+        recent.app?.let { launchAppResult(it, recordRecent = true) }
+        recent.device?.let { launchDeviceResult(it, recordRecent = true) }
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -257,7 +338,7 @@ fun HomeSearchScreen(
                     if (resumeSearchOnReturn && leftForSearchResult) {
                         resumeSearchOnReturn = false
                         leftForSearchResult = false
-                        if (searchActive && query.isNotBlank() && launchHomeRequest == latestHomeRequest) {
+                        if (searchActive && launchHomeRequest == latestHomeRequest) {
                             focusOnEntry = true
                         }
                     }
@@ -394,6 +475,36 @@ fun HomeSearchScreen(
             // Rows can pass beneath the floating controls; the last row can still scroll clear.
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = if (animateFromHome) 164.dp else 108.dp),
         ) {
+            if (showRecents && visibleRecents.isNotEmpty()) {
+                item(key = "section:recent") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Recent", style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.weight(1f))
+                        TextButton(enabled = isActive, onClick = onClearRecentResults,
+                            modifier = Modifier.semantics { contentDescription = "Clear recent searches" }) {
+                            Text("Clear")
+                        }
+                    }
+                }
+                items(visibleRecents, key = { "recent:${it.saved.identity}" }) { recent ->
+                    DeviceResultRow(
+                        DeviceSearchResult(recent.saved.identity, recent.title, recent.typeLabel, ""),
+                        onClick = { launchRecentResult(recent) },
+                        modifier = Modifier.animateItem(fadeInSpec = LauncherMotion.fade(),
+                            placementSpec = LauncherMotion.settle(), fadeOutSpec = LauncherMotion.fade()),
+                        showDetail = true,
+                        trailingContent = if (recent.saved.identity == latestRecent?.saved?.identity) {
+                            { Icon(Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "Opens with keyboard Go",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        } else null,
+                    )
+                }
+            }
             if (deviceSearch != null && query.isNotBlank() && filteredApps.isNotEmpty()) {
                 item(key = "section:apps") { SearchSectionLabel("Apps", Modifier.animateItem(fadeInSpec = LauncherMotion.fade(), placementSpec = LauncherMotion.settle(), fadeOutSpec = LauncherMotion.fade())) }
             }
@@ -421,7 +532,7 @@ fun HomeSearchScreen(
                 }
                 items(visibleContacts, key = { it.key }) { result ->
                     DeviceResultRow(result, onClick = { launchDeviceResult(result) },
-                        modifier = Modifier.animateItem(fadeInSpec = null,
+                        modifier = Modifier.animateItem(fadeInSpec = LauncherMotion.fade(),
                             placementSpec = LauncherMotion.settle(), fadeOutSpec = LauncherMotion.fade()))
                 }
                 if (!contactsAllowed) {
@@ -429,7 +540,7 @@ fun HomeSearchScreen(
                         DeviceResultRow(
                             DeviceSearchResult("permission", "Search contacts", "Allow contacts access", ""),
                             onClick = onRequestContacts,
-                            modifier = Modifier.animateItem(fadeInSpec = null,
+                            modifier = Modifier.animateItem(fadeInSpec = LauncherMotion.fade(),
                                 placementSpec = LauncherMotion.settle(), fadeOutSpec = LauncherMotion.fade()),
                         )
                     }
@@ -443,7 +554,7 @@ fun HomeSearchScreen(
                     item(key = "section:settings") { SearchSectionLabel("Settings", Modifier.animateItem(fadeInSpec = LauncherMotion.fade(), placementSpec = LauncherMotion.settle(), fadeOutSpec = LauncherMotion.fade())) }
                     items(settingsResults, key = { it.key }) { result ->
                         DeviceResultRow(result, onClick = { launchDeviceResult(result) },
-                        modifier = Modifier.animateItem(fadeInSpec = null,
+                        modifier = Modifier.animateItem(fadeInSpec = LauncherMotion.fade(),
                             placementSpec = LauncherMotion.settle(), fadeOutSpec = LauncherMotion.fade()))
                     }
                 }
@@ -528,7 +639,9 @@ fun HomeSearchScreen(
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
             keyboardActions = KeyboardActions(
                 onGo = {
-                    if (query.isEmpty()) {
+                    if (query.isBlank() && latestRecent != null) {
+                        launchRecentResult(latestRecent)
+                    } else if (query.isEmpty()) {
                         dismissSearch()
                         onBack()
                     } else {
@@ -666,6 +779,14 @@ private fun AppResultRow(
     }
 }
 
+private data class ResolvedRecentResult(
+    val saved: RecentSearchResult,
+    val title: String,
+    val typeLabel: String,
+    val app: LaunchableApp? = null,
+    val device: DeviceSearchResult? = null,
+)
+
 private class SearchResultsScrollReset {
     var appliedVersion: Any? = null
 }
@@ -677,27 +798,28 @@ private fun SearchSectionLabel(label: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun DeviceResultRow(result: DeviceSearchResult, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun DeviceResultRow(
+    result: DeviceSearchResult,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    showDetail: Boolean = false,
+    trailingContent: (@Composable () -> Unit)? = null,
+) {
     val interaction = remember { MutableInteractionSource() }
-    // Lazy-list appearance animations can be skipped for the first batch of rows.
-    // Give device results their own entrance, including contact-only searches.
-    val appearance = remember(result.key) { Animatable(0f) }
-    val entranceOffset = with(LocalDensity.current) { 12.dp.toPx() }
-    LaunchedEffect(result.key) {
-        appearance.animateTo(1f, LauncherMotion.search())
-    }
-    Column(modifier.fillMaxWidth().heightIn(min = 64.dp)
-        .graphicsLayer {
-            alpha = appearance.value
-            translationY = entranceOffset * (1f - appearance.value)
-        }
+    Row(modifier.fillMaxWidth().heightIn(min = 64.dp)
         .launcherPressFeedback(interaction)
         .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple(), onClick = onClick)
-        .padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.Center) {
-        Text(result.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (result.detail.isNotBlank() && result.detail != "Phone settings" && result.detail != "Contact") {
-            Text(result.detail, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        .padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(result.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (result.detail.isNotBlank() && (showDetail || (result.detail != "Phone settings" && result.detail != "Contact"))) {
+                Text(result.detail, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        if (trailingContent != null) {
+            Spacer(Modifier.width(16.dp))
+            trailingContent()
         }
     }
 }

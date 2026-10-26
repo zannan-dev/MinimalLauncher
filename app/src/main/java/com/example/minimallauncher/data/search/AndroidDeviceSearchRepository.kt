@@ -1,5 +1,7 @@
 package com.example.minimallauncher.data.search
 
+import com.example.minimallauncher.domain.RecentSearchResult
+import kotlinx.coroutines.CancellationException
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -66,6 +68,39 @@ class AndroidDeviceSearchRepository(context: Context) : DeviceSearchRepository {
             }
         }
         matches.values.toList()
+    }
+
+    override suspend fun resolveRecent(result: RecentSearchResult): DeviceSearchResult? = withContext(Dispatchers.IO) {
+        try {
+            when (result) {
+                is RecentSearchResult.App -> null
+                is RecentSearchResult.Contact -> {
+                    val lookup = Uri.parse(result.lookupUri)
+                    if (lookup.scheme != "content" || lookup.authority != ContactsContract.AUTHORITY ||
+                        !lookup.path.orEmpty().startsWith("/contacts/lookup/")) return@withContext null
+                    context.contentResolver.query(lookup, arrayOf(Contacts.DISPLAY_NAME_PRIMARY),
+                        null, null, null)?.use { cursor ->
+                        if (!cursor.moveToFirst()) null else DeviceSearchResult(
+                            "contact:${result.lookupUri}", cursor.getString(0).orEmpty().ifBlank { result.title },
+                            "Contact", Intent.ACTION_VIEW, result.lookupUri,
+                        )
+                    }
+                }
+                is RecentSearchResult.Setting -> {
+                    // Resolve from the current catalogue rather than launching a stored arbitrary action.
+                    supportedSettings.firstOrNull {
+                        "settings:${it.action}:${it.title}" == result.key && it.action == result.action &&
+                            it.preferenceKey == result.preferenceKey
+                    }?.let {
+                        DeviceSearchResult(result.key, it.title, it.detail, it.action, preferenceKey = it.preferenceKey)
+                    }
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
     }
 
     override fun open(result: DeviceSearchResult): Boolean = try {

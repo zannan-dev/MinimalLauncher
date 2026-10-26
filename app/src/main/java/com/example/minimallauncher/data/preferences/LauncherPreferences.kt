@@ -1,5 +1,7 @@
 package com.example.minimallauncher.data.preferences
 
+import com.example.minimallauncher.domain.RecentSearchResult
+
 /** User-controlled presentation preferences kept locally on the device. */
 data class LauncherPreferences(
     val showDate: Boolean,
@@ -7,6 +9,7 @@ data class LauncherPreferences(
     val theme: ThemePreference,
     val favoriteAppKeys: Set<String>,
     val favoriteAppOrder: List<String>,
+    val recentSearchResults: List<RecentSearchResult> = emptyList(),
 )
 
 enum class ThemePreference {

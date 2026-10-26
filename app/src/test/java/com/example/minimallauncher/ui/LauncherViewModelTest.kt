@@ -5,6 +5,8 @@ import com.example.minimallauncher.data.apps.ApplicationsRepository
 import com.example.minimallauncher.data.preferences.LauncherPreferences
 import com.example.minimallauncher.data.preferences.LauncherPreferencesRepository
 import com.example.minimallauncher.data.preferences.ThemePreference
+import com.example.minimallauncher.domain.RecentSearchResult
+import com.example.minimallauncher.domain.withRecentResult
 import com.example.minimallauncher.domain.LaunchableApp
 import com.example.minimallauncher.domain.toggledHomeFavorite
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +38,18 @@ class LauncherViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `records and clears recent search destinations`() = runTest(dispatcher) {
+        val viewModel = LauncherViewModel(FakeApplicationsRepository(emptyList()), FakePreferencesRepository())
+        val result = RecentSearchResult.App("test-app")
+        viewModel.recordRecentSearchResult(result)
+        advanceUntilIdle()
+        assertEquals(listOf(result), viewModel.uiState.value.preferences.recentSearchResults)
+        viewModel.clearRecentSearchResults()
+        advanceUntilIdle()
+        assertEquals(emptyList<RecentSearchResult>(), viewModel.uiState.value.preferences.recentSearchResults)
     }
 
     @Test
@@ -108,6 +122,12 @@ private class FakePreferencesRepository : LauncherPreferencesRepository {
     )
     override val preferences: Flow<LauncherPreferences> = state
 
+    override suspend fun recordRecentSearchResult(result: RecentSearchResult) {
+        state.value = state.value.copy(recentSearchResults = state.value.recentSearchResults.withRecentResult(result))
+    }
+    override suspend fun clearRecentSearchResults() {
+        state.value = state.value.copy(recentSearchResults = emptyList())
+    }
     override suspend fun setShowDate(enabled: Boolean) {
         state.value = state.value.copy(showDate = enabled)
     }
