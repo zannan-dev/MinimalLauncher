@@ -19,19 +19,14 @@ class DataStorePreferencesTest {
         val original = firstRepository.preferences.first()
         try {
             firstRepository.setShowDate(false)
-            firstRepository.setAssistantEnabled(false)
             firstRepository.setTheme(ThemePreference.DARK)
 
             val restored = DataStoreLauncherPreferencesRepository(context).preferences.first()
 
             assertEquals(false, restored.showDate)
-            assertEquals(false, restored.isAssistantEnabled)
 
-            firstRepository.setAssistantEnabled(true)
-            assertEquals(true, DataStoreLauncherPreferencesRepository(context).preferences.first().isAssistantEnabled)
             assertEquals(ThemePreference.DARK, restored.theme)
         } finally {
-            firstRepository.setAssistantEnabled(original.isAssistantEnabled)
             firstRepository.setShowDate(original.showDate)
             firstRepository.setTheme(original.theme)
         }

@@ -4,14 +4,9 @@ package com.example.minimallauncher.data.preferences
 data class LauncherPreferences(
     val showDate: Boolean,
     val autoOpenKeyboard: Boolean,
-    val doubleTapToLock: Boolean,
-    val showStatusBar: Boolean,
     val theme: ThemePreference,
     val favoriteAppKeys: Set<String>,
     val favoriteAppOrder: List<String>,
-    val isIntentionalPilotEnabled: Boolean,
-    val intentionalPilotAppKeys: Set<String>,
-    val isAssistantEnabled: Boolean = true,
 )
 
 enum class ThemePreference {

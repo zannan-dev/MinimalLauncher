@@ -91,12 +91,6 @@ class LauncherViewModel(
         viewModelScope.launch { preferencesRepository.moveFavorite(from.key, to.key) }
     }
 
-    fun toggleIntentionalPilotApp(app: LaunchableApp) {
-        viewModelScope.launch {
-            preferencesRepository.toggleIntentionalPilotApp(app.key)
-        }
-    }
-
     fun setShowDate(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.setShowDate(enabled)
@@ -106,30 +100,6 @@ class LauncherViewModel(
     fun setAutoOpenKeyboard(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.setAutoOpenKeyboard(enabled)
-        }
-    }
-
-    fun setDoubleTapToLock(enabled: Boolean) {
-        viewModelScope.launch {
-            preferencesRepository.setDoubleTapToLock(enabled)
-        }
-    }
-
-    fun setAssistantEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            preferencesRepository.setAssistantEnabled(enabled)
-        }
-    }
-
-    fun setShowStatusBar(enabled: Boolean) {
-        viewModelScope.launch {
-            preferencesRepository.setShowStatusBar(enabled)
-        }
-    }
-
-    fun setIntentionalPilotEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            preferencesRepository.setIntentionalPilotEnabled(enabled)
         }
     }
 

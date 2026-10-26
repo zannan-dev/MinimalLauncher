@@ -1,5 +1,7 @@
 package com.example.minimallauncher.ui.home
 
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -75,6 +77,7 @@ fun HomeFavorites(
     onDragActiveChanged: (Boolean) -> Unit = {},
     enabled: Boolean = true,
 ) {
+    val context = LocalContext.current
     var draggingKey by remember { mutableStateOf<String?>(null) }
     var dragPosition by remember { mutableStateOf(Offset.Zero) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
@@ -187,6 +190,7 @@ fun HomeFavorites(
                                         if (trashBounds?.contains(dragPosition) == true) {
                                             previewOrder = order - app.key
                                             onRemoveFavorite(app)
+                                            Toast.makeText(context, "Removed from favourites", Toast.LENGTH_SHORT).show()
                                         } else {
                                             val finalIndex = order.indexOf(app.key)
                                             if (finalIndex != apps.indexOf(app) && finalIndex in apps.indices) {

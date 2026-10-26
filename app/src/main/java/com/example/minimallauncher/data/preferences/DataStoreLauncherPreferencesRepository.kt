@@ -8,7 +8,6 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.example.minimallauncher.domain.toggledFavorite
 import com.example.minimallauncher.domain.toggledHomeFavorite
 import com.example.minimallauncher.domain.orderedFavoriteKeys
 import com.example.minimallauncher.domain.movedFavorite
@@ -41,30 +40,6 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
     override suspend fun setAutoOpenKeyboard(enabled: Boolean) {
         applicationContext.launcherDataStore.edit { values ->
             values[AUTO_OPEN_KEYBOARD] = enabled
-        }
-    }
-
-    override suspend fun setDoubleTapToLock(enabled: Boolean) {
-        applicationContext.launcherDataStore.edit { values ->
-            values[DOUBLE_TAP_TO_LOCK] = enabled
-        }
-    }
-
-    override suspend fun setAssistantEnabled(enabled: Boolean) {
-        applicationContext.launcherDataStore.edit { values ->
-            values[ASSISTANT_ENABLED] = enabled
-        }
-    }
-
-    override suspend fun setShowStatusBar(enabled: Boolean) {
-        applicationContext.launcherDataStore.edit { values ->
-            values[SHOW_STATUS_BAR] = enabled
-        }
-    }
-
-    override suspend fun setIntentionalPilotEnabled(enabled: Boolean) {
-        applicationContext.launcherDataStore.edit { values ->
-            values[INTENTIONAL_PILOT] = enabled
         }
     }
 
@@ -108,38 +83,22 @@ class DataStoreLauncherPreferencesRepository(context: Context) : LauncherPrefere
         }
     }
 
-    override suspend fun toggleIntentionalPilotApp(appKey: String) {
-        applicationContext.launcherDataStore.edit { values ->
-            values[INTENTIONAL_PILOT_APP_KEYS] = toggledFavorite(values[INTENTIONAL_PILOT_APP_KEYS].orEmpty(), appKey)
-        }
-    }
-
     private fun Preferences.toLauncherPreferences() = LauncherPreferences(
         showDate = this[SHOW_DATE] ?: true,
-        isAssistantEnabled = this[ASSISTANT_ENABLED] ?: true,
         autoOpenKeyboard = this[AUTO_OPEN_KEYBOARD] ?: true,
-        doubleTapToLock = this[DOUBLE_TAP_TO_LOCK] ?: true,
-        showStatusBar = this[SHOW_STATUS_BAR] ?: false,
         theme = ThemePreference.fromStorage(this[THEME]),
         favoriteAppKeys = this[FAVORITE_APP_KEYS].orEmpty(),
         favoriteAppOrder = orderedFavoriteKeys(
             this[FAVORITE_APP_KEYS].orEmpty(), decodeFavoriteOrder(this[FAVORITE_APP_ORDER]),
         ),
-        isIntentionalPilotEnabled = this[INTENTIONAL_PILOT] ?: false,
-        intentionalPilotAppKeys = this[INTENTIONAL_PILOT_APP_KEYS].orEmpty(),
     )
 
     private companion object {
-        val ASSISTANT_ENABLED = booleanPreferencesKey("assistant_enabled")
         val SHOW_DATE = booleanPreferencesKey("show_date")
         val AUTO_OPEN_KEYBOARD = booleanPreferencesKey("auto_open_keyboard")
-        val DOUBLE_TAP_TO_LOCK = booleanPreferencesKey("double_tap_to_lock")
-        val SHOW_STATUS_BAR = booleanPreferencesKey("show_status_bar")
         val THEME = stringPreferencesKey("theme")
         val FAVORITE_APP_KEYS = stringSetPreferencesKey("favorite_app_keys")
         val FAVORITE_APP_ORDER = stringPreferencesKey("favorite_app_order")
-        val INTENTIONAL_PILOT = booleanPreferencesKey("intentional_pilot")
-        val INTENTIONAL_PILOT_APP_KEYS = stringSetPreferencesKey("intentional_pilot_app_keys")
     }
 
     private fun decodeFavoriteOrder(saved: String?): List<String> = try {

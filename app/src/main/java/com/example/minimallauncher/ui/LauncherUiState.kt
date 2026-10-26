@@ -10,13 +10,9 @@ data class LauncherUiState(
     val preferences: LauncherPreferences = LauncherPreferences(
         showDate = true,
         autoOpenKeyboard = true,
-        doubleTapToLock = true,
-        showStatusBar = false,
         theme = ThemePreference.SYSTEM,
         favoriteAppKeys = emptySet(),
         favoriteAppOrder = emptyList(),
-        isIntentionalPilotEnabled = false,
-        intentionalPilotAppKeys = emptySet(),
     ),
     val isLoadingApps: Boolean = true,
     val appLoadError: Boolean = false,

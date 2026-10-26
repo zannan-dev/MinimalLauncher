@@ -79,48 +79,20 @@ class LauncherAppTest {
     }
 
     @Test
-    fun assistantCanBeDisabledAndEnabledInSettings() {
-        val viewModel = LauncherViewModel(
-            applicationsRepository = TestApplicationsRepository(),
-            preferencesRepository = TestPreferencesRepository(),
-        )
+    fun homeAndSettingsHaveNoAssistantOrMicrophonePermission() {
+        val viewModel = LauncherViewModel(TestApplicationsRepository(), TestPreferencesRepository())
         composeRule.setContent {
             LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
         }
-
-        composeRule.onNodeWithContentDescription("Voice assistant").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Current time").performTouchInput { longClick() }
-        composeRule.onNodeWithText("Use assistant").assertIsOn().performClick().assertIsOff()
-        Espresso.pressBack()
         composeRule.onNodeWithContentDescription("Voice assistant").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Current time").assertIsDisplayed()
-
         composeRule.onNodeWithContentDescription("Current time").performTouchInput { longClick() }
-        composeRule.onNodeWithText("Use assistant").performClick().assertIsOn()
-        Espresso.pressBack()
-        composeRule.onNodeWithContentDescription("Voice assistant").assertIsDisplayed()
-    }
-
-    @Test
-    fun swipingWhileAssistantIsOpenKeepsHomeAndAssistantVisible() {
-        val viewModel = LauncherViewModel(
-            applicationsRepository = TestApplicationsRepository(),
-            preferencesRepository = TestPreferencesRepository(),
-        )
-        composeRule.setContent {
-            LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
-        }
-        val clock = composeRule.onNodeWithContentDescription("Current time")
-        val initialX = clock.fetchSemanticsNode().positionInRoot.x
-        composeRule.onNodeWithContentDescription("Voice assistant").performClick()
-        composeRule.onRoot().performTouchInput { swipeLeft() }
-        composeRule.onRoot().performTouchInput { swipeDown() }
-        composeRule.onNodeWithContentDescription("Close assistant").assertIsDisplayed()
-        assertEquals(initialX, clock.fetchSemanticsNode().positionInRoot.x, 1f)
-        composeRule.onNodeWithContentDescription("Close assistant").performClick()
-        composeRule.onRoot().performTouchInput { swipeLeft() }
-        composeRule.onNodeWithTag("Home search").assertDoesNotExist()
-        composeRule.onNodeWithText("All apps").assertDoesNotExist()
+        composeRule.onNodeWithText("Theme").assertIsDisplayed()
+        composeRule.onNodeWithText("Use assistant").assertDoesNotExist()
+        val context = composeRule.activity
+        val permissions = context.packageManager.getPackageInfo(
+            context.packageName, android.content.pm.PackageManager.GET_PERMISSIONS,
+        ).requestedPermissions.orEmpty()
+        assertTrue(android.Manifest.permission.RECORD_AUDIO !in permissions)
     }
 
     @Test
@@ -260,23 +232,17 @@ class LauncherAppTest {
     }
 
     @Test
-    fun cancellingPilotReturnsToHomeAndFreshSearch() {
+    fun searchResultLaunchesImmediately() {
         val app = LaunchableApp("camera", "Activity", "Camera", Process.myUserHandle(), false)
-        val viewModel = LauncherViewModel(
-            applicationsRepository = TestApplicationsRepository(listOf(app)),
-            preferencesRepository = TestPreferencesRepository(intentionalPilotAppKeys = setOf(app.key)),
-        )
+        val repository = TestApplicationsRepository(listOf(app))
+        val viewModel = LauncherViewModel(repository, TestPreferencesRepository())
         composeRule.setContent {
             LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
         }
         composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
         composeRule.onNode(hasSetTextAction()).performTextInput("cam")
         composeRule.onNodeWithText("Camera").performClick()
-        composeRule.onNodeWithText("Do you need to open Camera?").assertIsDisplayed()
-        Espresso.pressBack()
-        composeRule.onNodeWithContentDescription("Current time").assertIsDisplayed()
-        composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
-        composeRule.onNodeWithText("Search apps...").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(listOf(app), repository.launchedApps) }
     }
 
     @Test
@@ -327,7 +293,6 @@ class LauncherAppTest {
         composeRule.runOnIdle { assertEquals(0, openCount) }
         composeRule.onNodeWithContentDescription("Close home search").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Favorite Favorite").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Voice assistant").assertIsDisplayed()
     }
 
     @Test
@@ -385,7 +350,6 @@ class LauncherAppTest {
         composeRule.onRoot().performTouchInput { swipeLeft() }
         composeRule.onNodeWithContentDescription("Close home search").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Close home search").performClick()
-        composeRule.onNodeWithContentDescription("Voice assistant").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Favorite Favorite").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Current time").assertIsDisplayed()
     }
@@ -396,8 +360,6 @@ class LauncherAppTest {
         composeRule.setContent {
             LauncherApp(viewModel = viewModel, onOpenDefaultLauncherSettings = {}, onOpenNotifications = {})
         }
-        val ring = composeRule.onNodeWithContentDescription("Voice assistant")
-        val restingCenter = ring.fetchSemanticsNode().boundsInRoot.center
         var searchCenter: Offset? = null
         repeat(4) {
             composeRule.onRoot().performTouchInput { swipe(center, Offset(center.x, height * 0.8f)) }
@@ -414,8 +376,6 @@ class LauncherAppTest {
             searchCenter = center
             composeRule.onNodeWithContentDescription("Close home search").performClick()
             pill.assertDoesNotExist()
-            ring.assertIsDisplayed()
-            assertEquals(restingCenter.y, ring.fetchSemanticsNode().boundsInRoot.center.y, 1f)
             // Reopen as soon as the return finishes, with no settling delay.
         }
     }
@@ -497,7 +457,6 @@ class LauncherAppTest {
                 widthRatio, (closingCloseX - closingBounds.center.x) / (expandedCloseX - expandedBounds.center.x), 0.02f)
             composeRule.mainClock.advanceTimeBy(1_000)
             pill.assertDoesNotExist()
-            composeRule.onNodeWithContentDescription("Voice assistant").assertIsDisplayed()
         } finally { composeRule.mainClock.autoAdvance = true }
     }
 
@@ -540,7 +499,6 @@ class LauncherAppTest {
         assertTrue("Releasing an empty search swipe must keep the keyboard visible", keyboardVisible())
         tapBackground()
         composeRule.onNodeWithContentDescription("Close home search").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Voice assistant").assertIsDisplayed()
         openSearch()
         composeRule.onNodeWithTag("Home search").performTextInput("zzqxv")
         tapBackground()
@@ -548,7 +506,7 @@ class LauncherAppTest {
     }
 
     @Test
-    fun homeAndBackDismissHomeSearchAndRestoreAssistant() {
+    fun homeAndBackDismissHomeSearchAndRestoreHome() {
         val viewModel = LauncherViewModel(
             applicationsRepository = TestApplicationsRepository(),
             preferencesRepository = TestPreferencesRepository(),
@@ -566,7 +524,6 @@ class LauncherAppTest {
                 else composeRule.activity.onBackPressedDispatcher.onBackPressed()
             }
             composeRule.onNodeWithContentDescription("Close home search").assertDoesNotExist()
-            composeRule.onNodeWithContentDescription("Voice assistant").assertIsDisplayed()
         }
     }
 
@@ -631,13 +588,16 @@ private class TestApplicationsRepository(
 ) : ApplicationsRepository {
     override suspend fun loadApps(): List<LaunchableApp> = apps
 
-    override fun launchApp(app: LaunchableApp): Boolean = true
+    val launchedApps = mutableListOf<LaunchableApp>()
+    override fun launchApp(app: LaunchableApp): Boolean {
+        launchedApps += app
+        return true
+    }
 }
 
 private class TestPreferencesRepository(
     favorites: List<String> = emptyList(),
     autoOpenKeyboard: Boolean = false,
-    intentionalPilotAppKeys: Set<String> = emptySet(),
 ) : LauncherPreferencesRepository {
     private val state = MutableStateFlow(
         LauncherPreferences(
@@ -646,23 +606,12 @@ private class TestPreferencesRepository(
             favoriteAppKeys = favorites.toSet(),
             favoriteAppOrder = favorites,
             autoOpenKeyboard = autoOpenKeyboard,
-            doubleTapToLock = false,
-            showStatusBar = true,
-            isIntentionalPilotEnabled = intentionalPilotAppKeys.isNotEmpty(),
-            intentionalPilotAppKeys = intentionalPilotAppKeys,
         ),
     )
     override val preferences: Flow<LauncherPreferences> = state
 
     override suspend fun setShowDate(enabled: Boolean) = Unit
     override suspend fun setAutoOpenKeyboard(enabled: Boolean) = Unit
-    override suspend fun setDoubleTapToLock(enabled: Boolean) = Unit
-    override suspend fun setAssistantEnabled(enabled: Boolean) {
-        state.value = state.value.copy(isAssistantEnabled = enabled)
-    }
-    override suspend fun setShowStatusBar(enabled: Boolean) = Unit
-    override suspend fun setIntentionalPilotEnabled(enabled: Boolean) = Unit
-    override suspend fun toggleIntentionalPilotApp(appKey: String) = Unit
     override suspend fun setTheme(theme: ThemePreference) = Unit
     override suspend fun toggleFavorite(appKey: String) = Unit
     override suspend fun removeFavorite(appKey: String) = Unit

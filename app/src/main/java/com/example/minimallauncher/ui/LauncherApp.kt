@@ -1,11 +1,6 @@
 package com.example.minimallauncher.ui
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -33,12 +28,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.runtime.Composable
 import androidx.compose.animation.togetherWith
@@ -56,15 +49,12 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.minimallauncher.ui.apps.HomeSearchScreen
-import com.example.minimallauncher.ui.apps.IntentionalPilotAppSelectionScreen
-import com.example.minimallauncher.ui.apps.IntentionalPilotScreen
 import com.example.minimallauncher.ui.home.HomeScreen
-import com.example.minimallauncher.domain.LaunchableApp
 import com.example.minimallauncher.ui.settings.SettingsScreen
 import com.example.minimallauncher.ui.motion.LauncherMotion
 import com.example.minimallauncher.ui.theme.LauncherTheme
 
-private enum class LauncherScreen { HOME, SETTINGS, INTENTIONAL_PILOT_APPS }
+private enum class LauncherScreen { HOME, SETTINGS }
 
 @Composable
 fun LauncherApp(
@@ -109,11 +99,7 @@ fun LauncherApp(
     var handledHomeRequest by rememberSaveable { mutableStateOf(0L) }
     val returningHome = homeRequest != handledHomeRequest
     var currentScreenName by rememberSaveable { mutableStateOf(LauncherScreen.HOME.name) }
-    val currentScreen = LauncherScreen.valueOf(currentScreenName)
-    val assistantExpansion = remember { mutableStateOf(false) }
-    LaunchedEffect(state.preferences.isAssistantEnabled) {
-        if (!state.preferences.isAssistantEnabled) assistantExpansion.value = false
-    }
+    val currentScreen = LauncherScreen.entries.firstOrNull { it.name == currentScreenName } ?: LauncherScreen.HOME
     var homeSearchVisible by remember { mutableStateOf(false) }
     val searchAnimation = remember { Animatable(0f) }
     val searchScope = rememberCoroutineScope()
@@ -137,27 +123,15 @@ fun LauncherApp(
     var searchKeyboardBottom by remember(androidx.compose.ui.platform.LocalConfiguration.current) { mutableStateOf(0) }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    var appPendingLaunch by remember { mutableStateOf<LaunchableApp?>(null) }
-    var lastPendingApp by remember { mutableStateOf<LaunchableApp?>(null) }
     val openHome: () -> Unit = {
         setSearchVisible(false)
-        appPendingLaunch = null
         currentScreenName = LauncherScreen.HOME.name
     }
 
-    val handleAppLaunch: (LaunchableApp) -> Unit = { app ->
-        if (state.preferences.isIntentionalPilotEnabled && app.key in state.preferences.intentionalPilotAppKeys) {
-            lastPendingApp = app
-            appPendingLaunch = app
-        } else {
-            viewModel.launchApp(app)
-        }
-    }
 
     LaunchedEffect(homeRequest) {
         if (returningHome) {
             setSearchVisible(false)
-            appPendingLaunch = null
             currentScreenName = LauncherScreen.HOME.name
             focusManager.clearFocus(force = true)
             keyboardController?.hide()
@@ -167,23 +141,18 @@ fun LauncherApp(
 
     BackHandler(enabled = currentScreen != LauncherScreen.HOME, onBack = openHome)
 
-    BackHandler(enabled = appPendingLaunch != null, onBack = openHome)
-    BackHandler(enabled = homeSearchVisible && appPendingLaunch == null) {
+    BackHandler(enabled = homeSearchVisible) {
         setSearchVisible(false)
         focusManager.clearFocus(force = true)
         keyboardController?.hide()
     }
 
     val view = LocalView.current
-    LaunchedEffect(view, state.preferences.showStatusBar) {
+    LaunchedEffect(view) {
         val window = (view.context as? Activity)?.window ?: return@LaunchedEffect
         val controller = WindowInsetsControllerCompat(window, view)
-        if (state.preferences.showStatusBar) {
-            controller.show(WindowInsetsCompat.Type.statusBars())
-        } else {
-            controller.hide(WindowInsetsCompat.Type.statusBars())
-            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
+        controller.hide(WindowInsetsCompat.Type.statusBars())
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
 
     LauncherTheme(preference = state.preferences.theme) {
@@ -198,11 +167,7 @@ fun LauncherApp(
             }
         }
         Surface(modifier = Modifier.fillMaxSize(), color = background) {
-            val paddingModifier = if (state.preferences.showStatusBar) {
-                Modifier.systemBarsPadding()
-            } else {
-                Modifier.navigationBarsPadding().displayCutoutPadding()
-            }
+            val paddingModifier = Modifier.navigationBarsPadding().displayCutoutPadding()
             Box(modifier = Modifier.fillMaxSize().then(paddingModifier)) {
                 androidx.compose.animation.AnimatedContent(
                     targetState = currentScreen,
@@ -220,30 +185,16 @@ fun LauncherApp(
                             HomeScreen(
                                 favoriteApps = state.favoriteApps,
                                 showDate = state.preferences.showDate,
-                                doubleTapToLock = state.preferences.doubleTapToLock,
                                 onOpenSearch = { searchSession++; homeAllApps = false; setSearchVisible(true) },
                                 onOpenNotifications = onOpenNotifications,
                                 onOpenSettings = { currentScreenName = LauncherScreen.SETTINGS.name },
                                 onSetDefaultLauncher = onOpenDefaultLauncherSettings,
-                                onLaunchApp = handleAppLaunch,
+                                onLaunchApp = viewModel::launchApp,
                                 onMoveFavorite = viewModel::moveFavorite,
                                 onRemoveFavorite = viewModel::removeFavorite,
-                                assistantExpansion = assistantExpansion,
                                 searchVisible = searchPresent,
                                 searchProgress = searchProgress,
-                                gesturesEnabled = !returningHome && appPendingLaunch == null,
-                                assistantContent = { expansionState ->
-                                    if (state.preferences.isAssistantEnabled) {
-                                        com.example.minimallauncher.ui.assistant.HomeAssistant(
-                                            apps = state.apps,
-                                            deviceSearch = deviceSearch,
-                                            onLaunchApp = handleAppLaunch,
-                                            isActive = !searchPresent && !returningHome && currentScreen == LauncherScreen.HOME && appPendingLaunch == null,
-                                            homeRequest = homeRequest,
-                                            expansionState = expansionState,
-                                        )
-                                    }
-                                },
+                                gesturesEnabled = !returningHome,
                             )
                             // Retain the overlay until its closing transition completes.
                             if (searchPresent) {
@@ -252,9 +203,9 @@ fun LauncherApp(
                                     autoOpenKeyboard = !homeAllApps || state.preferences.autoOpenKeyboard,
                                     focusOnOpen = !homeAllApps, isLoading = state.isLoadingApps,
                                     failedToLoad = state.appLoadError, favoriteKeys = state.preferences.favoriteAppKeys,
-                                    onBack = { setSearchVisible(false) }, onLaunchApp = handleAppLaunch,
+                                    onBack = { setSearchVisible(false) }, onLaunchApp = viewModel::launchApp,
                                     onToggleFavorite = viewModel::toggleFavorite,
-                                    isActive = homeSearchVisible && !returningHome && appPendingLaunch == null,
+                                    isActive = homeSearchVisible && !returningHome,
                                     homeRequest = homeRequest, deviceSearch = deviceSearch,
                                     contactsAllowed = contactsAllowed, contactsRevision = contactsRevision,
                                     onRequestContacts = requestContacts, animateFromHome = true,
@@ -266,47 +217,10 @@ fun LauncherApp(
                             }
                         }
                         LauncherScreen.SETTINGS -> SettingsScreen(
-                            showDate = state.preferences.showDate,
-                            autoOpenKeyboard = state.preferences.autoOpenKeyboard,
-                            doubleTapToLock = state.preferences.doubleTapToLock,
-                            showStatusBar = state.preferences.showStatusBar,
-                            isAssistantEnabled = state.preferences.isAssistantEnabled,
-                            isIntentionalPilotEnabled = state.preferences.isIntentionalPilotEnabled,
                             theme = state.preferences.theme,
-                            onShowDateChanged = viewModel::setShowDate,
-                            onAutoOpenKeyboardChanged = viewModel::setAutoOpenKeyboard,
-                            onDoubleTapToLockChanged = viewModel::setDoubleTapToLock,
-                            onShowStatusBarChanged = viewModel::setShowStatusBar,
-                            onAssistantEnabledChanged = viewModel::setAssistantEnabled,
-                            onIntentionalPilotEnabledChanged = viewModel::setIntentionalPilotEnabled,
-                            onSelectIntentionalPilotApps = { currentScreenName = LauncherScreen.INTENTIONAL_PILOT_APPS.name },
+                            onBack = openHome,
                             onThemeChanged = viewModel::setTheme,
                             onOpenDefaultLauncherSettings = onOpenDefaultLauncherSettings,
-                        )
-                        LauncherScreen.INTENTIONAL_PILOT_APPS -> IntentionalPilotAppSelectionScreen(
-                            apps = state.apps,
-                            selectedAppKeys = state.preferences.intentionalPilotAppKeys,
-                            onToggleApp = viewModel::toggleIntentionalPilotApp,
-                            onBack = { currentScreenName = LauncherScreen.SETTINGS.name },
-                        )
-                    }
-                }
-                AnimatedVisibility(
-                    visible = appPendingLaunch != null,
-                    modifier = Modifier.fillMaxSize(),
-                    enter = fadeIn(LauncherMotion.fade()) + scaleIn(LauncherMotion.settle(), initialScale = 0.98f),
-                    exit = fadeOut(LauncherMotion.fade()) + scaleOut(LauncherMotion.settle(), targetScale = 0.98f),
-                ) {
-                    lastPendingApp?.let { app ->
-                        IntentionalPilotScreen(
-                            app = app,
-                            onLaunchApp = {
-                                if (appPendingLaunch != null) {
-                                    viewModel.launchApp(app)
-                                    appPendingLaunch = null
-                                }
-                            },
-                            onCancel = openHome,
                         )
                     }
                 }

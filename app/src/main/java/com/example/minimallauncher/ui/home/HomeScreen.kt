@@ -5,11 +5,8 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.ui.zIndex
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -21,15 +18,12 @@ import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -44,7 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
@@ -63,7 +56,6 @@ import java.util.Locale
 fun HomeScreen(
     favoriteApps: List<LaunchableApp>,
     showDate: Boolean,
-    doubleTapToLock: Boolean,
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onSetDefaultLauncher: () -> Unit,
@@ -71,15 +63,10 @@ fun HomeScreen(
     onMoveFavorite: (LaunchableApp, LaunchableApp) -> Unit,
     onRemoveFavorite: (LaunchableApp) -> Unit,
     onOpenNotifications: () -> Unit = {},
-    assistantExpansion: androidx.compose.runtime.MutableState<Boolean>? = null,
     searchVisible: Boolean = false,
     searchProgress: Float = if (searchVisible) 1f else 0f,
     gesturesEnabled: Boolean = true,
-    assistantContent: @Composable (androidx.compose.runtime.MutableState<Boolean>) -> Unit = {},
 ) {
-    val assistantExpanded = assistantExpansion ?: remember { mutableStateOf(false) }
-    val favoriteAlpha by animateFloatAsState(if (assistantExpanded.value) 0f else 1f,
-        LauncherMotion.fade(), label = "Home favourites presence")
     var draggingFavorite by remember { mutableStateOf(false) }
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     var isDefaultLauncher by remember { mutableStateOf(true) }
@@ -154,11 +141,11 @@ fun HomeScreen(
             }
         }
     }
-    BoxWithConstraints(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(onOpenSearch, assistantExpanded.value, searchVisible, gesturesEnabled) {
-                if (!gesturesEnabled || assistantExpanded.value || searchVisible) return@pointerInput
+            .pointerInput(onOpenSearch, searchVisible, gesturesEnabled) {
+                if (!gesturesEnabled || searchVisible) return@pointerInput
                 var drag = 0f
                 var handled = false
                 val threshold = 72.dp.toPx()
@@ -174,32 +161,22 @@ fun HomeScreen(
                     onDragCancel = { drag = 0f; handled = false },
                 )
             }
-            .pointerInput(onOpenSettings, assistantExpanded.value, searchVisible, gesturesEnabled) {
+            .pointerInput(onOpenSettings, searchVisible, gesturesEnabled) {
                 if (!gesturesEnabled || searchVisible) return@pointerInput
-                if (assistantExpanded.value) {
-                    detectTapGestures(onTap = { assistantExpanded.value = false })
-                    return@pointerInput
-                }
                 detectTapGestures(
                     onLongPress = { onOpenSettings() },
                     onDoubleTap = {
-                        if (doubleTapToLock) {
-                            if (!LauncherAccessibilityService.lockScreen()) {
-                                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                            }
+                        if (!LauncherAccessibilityService.lockScreen()) {
+                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                         }
                     }
                 )
             }
             .padding(horizontal = 24.dp),
     ) {
-        val headerAlpha by animateFloatAsState(when {
-            assistantExpanded.value -> 0.45f
-            else -> 1f
-        }, LauncherMotion.fade(), label = "Home context presence")
         Column(Modifier.fillMaxSize()) {
             Column(
-                modifier = Modifier.padding(top = 8.dp).graphicsLayer { alpha = headerAlpha * (1f - LauncherMotion.reveal(searchProgress)) }
+                modifier = Modifier.padding(top = 8.dp).graphicsLayer { alpha = 1f - LauncherMotion.reveal(searchProgress) }
                     .then(if (searchVisible) Modifier.clearAndSetSemantics {} else Modifier),
                 horizontalAlignment = Alignment.Start,
             ) {
@@ -233,7 +210,7 @@ fun HomeScreen(
                         fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onBackground,
                         textDecoration = TextDecoration.Underline,
-                        modifier = Modifier.clickable(enabled = !assistantExpanded.value && !searchVisible, onClick = onSetDefaultLauncher),
+                        modifier = Modifier.clickable(enabled = !searchVisible, onClick = onSetDefaultLauncher),
                     )
                 }
             }
@@ -243,31 +220,13 @@ fun HomeScreen(
                 onMoveFavorite = onMoveFavorite,
                 onRemoveFavorite = onRemoveFavorite,
                 onDragActiveChanged = { draggingFavorite = it },
-                enabled = !assistantExpanded.value && !searchVisible,
+                enabled = !searchVisible,
                 modifier = Modifier.weight(1f).padding(top = 24.dp)
                     .zIndex(if (draggingFavorite) 2f else 0f)
-                    .graphicsLayer { alpha = favoriteAlpha * (1f - LauncherMotion.reveal(searchProgress)) }
-                    .then(if (assistantExpanded.value || searchVisible) Modifier.clearAndSetSemantics {} else Modifier),
+                    .graphicsLayer { alpha = 1f - LauncherMotion.reveal(searchProgress) }
+                    .then(if (searchVisible) Modifier.clearAndSetSemantics {} else Modifier),
             )
         }
-        if (assistantExpanded.value && !searchVisible && gesturesEnabled) {
-            // Faded-out favourites still participate in hit testing. Catch outside taps
-            // above them, while leaving the assistant's controls on top.
-            Box(Modifier.matchParentSize().pointerInput(assistantExpanded) {
-                detectTapGestures(onTap = { assistantExpanded.value = false })
-            })
-        }
-        AnimatedVisibility(
-            visible = !draggingFavorite,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)
-                .heightIn(max = (maxHeight - 144.dp).coerceAtLeast(0.dp))
-                .graphicsLayer {
-                    alpha = 1f - LauncherMotion.reveal(searchProgress)
-                }
-                .then(if (searchVisible) Modifier.clearAndSetSemantics {} else Modifier),
-            enter = fadeIn(LauncherMotion.fade()) + scaleIn(LauncherMotion.settle(), initialScale = 0.88f),
-            exit = fadeOut(LauncherMotion.fade()) + scaleOut(LauncherMotion.settle(), targetScale = 0.8f),
-        ) { assistantContent(assistantExpanded) }
     }
 }
 

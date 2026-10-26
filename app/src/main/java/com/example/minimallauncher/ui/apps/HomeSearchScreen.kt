@@ -7,6 +7,7 @@ import kotlinx.coroutines.delay
 import android.widget.Toast
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.fadeIn
@@ -140,17 +141,27 @@ fun HomeSearchScreen(
     val filteredApps = remember(apps, query, animateFromHome, showAllApps) {
         if (animateFromHome && query.isBlank() && !showAllApps) emptyList() else filterApps(apps, query)
     }
-    LaunchedEffect(showAllApps) {
-        if (showAllApps) listState.scrollToItem(0)
-    }
     val homePresence = homeSearchProgress.coerceIn(0f, 1f)
     val context = LocalContext.current
-    val settingsResults = remember(deviceSearch, query) { deviceSearch?.settings(query).orEmpty() }
+    val matchingSettings = remember(deviceSearch, query) { deviceSearch?.settings(query).orEmpty() }
     var contactQuery by remember { mutableStateOf("") }
     var contactResults by remember { mutableStateOf(emptyList<DeviceSearchResult>()) }
     var contactsLoading by remember { mutableStateOf(false) }
     var contactsFailed by remember { mutableStateOf(false) }
     val visibleContacts = if (contactsAllowed && contactQuery == query) contactResults else emptyList()
+    // Publish settings alongside contacts for this query, so late contacts don't
+    // insert above settings that the user has already started reading.
+    val settingsResults = if (!contactsAllowed || contactQuery == query) matchingSettings else emptyList()
+    val resultsVersion = remember(query, showAllApps, filteredApps, visibleContacts, settingsResults, contactsAllowed, contactsFailed) { Any() }
+    val scrollReset = remember(listState) { SearchResultsScrollReset() }
+    SideEffect {
+        if (scrollReset.appliedVersion !== resultsVersion) {
+            // Request the top position before layout preserves the old anchor by key.
+            // A later reset can see that moved anchor and cancel item animations.
+            listState.requestScrollToItem(0)
+            scrollReset.appliedVersion = resultsVersion
+        }
+    }
     val contactsPending = deviceSearch != null && contactsAllowed && query.isNotBlank() && isActive &&
         (contactQuery != query || contactsLoading)
     LaunchedEffect(query, contactsAllowed, contactsRevision, isActive, deviceSearch) {
@@ -410,7 +421,7 @@ fun HomeSearchScreen(
                 }
                 items(visibleContacts, key = { it.key }) { result ->
                     DeviceResultRow(result, onClick = { launchDeviceResult(result) },
-                        modifier = Modifier.animateItem(fadeInSpec = LauncherMotion.fade(),
+                        modifier = Modifier.animateItem(fadeInSpec = null,
                             placementSpec = LauncherMotion.settle(), fadeOutSpec = LauncherMotion.fade()))
                 }
                 if (!contactsAllowed) {
@@ -418,17 +429,21 @@ fun HomeSearchScreen(
                         DeviceResultRow(
                             DeviceSearchResult("permission", "Search contacts", "Allow contacts access", ""),
                             onClick = onRequestContacts,
+                            modifier = Modifier.animateItem(fadeInSpec = null,
+                                placementSpec = LauncherMotion.settle(), fadeOutSpec = LauncherMotion.fade()),
                         )
                     }
                 } else if (contactsFailed) {
-                    item(key = "contacts:error") { Text("Contacts unavailable", Modifier.padding(16.dp),
+                    item(key = "contacts:error") { Text("Contacts unavailable", Modifier.animateItem(
+                        fadeInSpec = LauncherMotion.fade(), placementSpec = LauncherMotion.settle(),
+                        fadeOutSpec = LauncherMotion.fade()).padding(16.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
                 if (settingsResults.isNotEmpty()) {
                     item(key = "section:settings") { SearchSectionLabel("Settings", Modifier.animateItem(fadeInSpec = LauncherMotion.fade(), placementSpec = LauncherMotion.settle(), fadeOutSpec = LauncherMotion.fade())) }
                     items(settingsResults, key = { it.key }) { result ->
                         DeviceResultRow(result, onClick = { launchDeviceResult(result) },
-                        modifier = Modifier.animateItem(fadeInSpec = LauncherMotion.fade(),
+                        modifier = Modifier.animateItem(fadeInSpec = null,
                             placementSpec = LauncherMotion.settle(), fadeOutSpec = LauncherMotion.fade()))
                     }
                 }
@@ -601,6 +616,9 @@ private fun AppResultRow(
                             Toast.LENGTH_SHORT).show()
                     } else {
                         onToggleFavorite(app)
+                        Toast.makeText(context,
+                            if (isFavorite) "Removed from favourites" else "Added to favourites",
+                            Toast.LENGTH_SHORT).show()
                     }
                     onToggleOptions(false)
                 }) {
@@ -648,6 +666,10 @@ private fun AppResultRow(
     }
 }
 
+private class SearchResultsScrollReset {
+    var appliedVersion: Any? = null
+}
+
 @Composable
 private fun SearchSectionLabel(label: String, modifier: Modifier = Modifier) {
     Text(label, modifier = modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
@@ -657,7 +679,19 @@ private fun SearchSectionLabel(label: String, modifier: Modifier = Modifier) {
 @Composable
 private fun DeviceResultRow(result: DeviceSearchResult, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
-    Column(modifier.fillMaxWidth().heightIn(min = 64.dp).launcherPressFeedback(interaction)
+    // Lazy-list appearance animations can be skipped for the first batch of rows.
+    // Give device results their own entrance, including contact-only searches.
+    val appearance = remember(result.key) { Animatable(0f) }
+    val entranceOffset = with(LocalDensity.current) { 12.dp.toPx() }
+    LaunchedEffect(result.key) {
+        appearance.animateTo(1f, LauncherMotion.search())
+    }
+    Column(modifier.fillMaxWidth().heightIn(min = 64.dp)
+        .graphicsLayer {
+            alpha = appearance.value
+            translationY = entranceOffset * (1f - appearance.value)
+        }
+        .launcherPressFeedback(interaction)
         .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple(), onClick = onClick)
         .padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.Center) {
         Text(result.title, maxLines = 1, overflow = TextOverflow.Ellipsis)

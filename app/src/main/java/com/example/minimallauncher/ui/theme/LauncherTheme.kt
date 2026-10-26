@@ -19,6 +19,10 @@ private val LightColors = lightColorScheme(
     onSurface = Color(0xFF1B1C19),
     surfaceVariant = Color(0xFFE4E2DC),
     onSurfaceVariant = Color(0xFF474742),
+    secondaryContainer = Color(0xFFE4E2DC),
+    onSecondaryContainer = Color(0xFF1B1C19),
+    outline = Color(0xFF777770),
+    outlineVariant = Color(0xFFC8C6C0),
 )
 
 private val DarkColors = darkColorScheme(
@@ -30,6 +34,10 @@ private val DarkColors = darkColorScheme(
     onSurface = Color(0xFFE3E3DC),
     surfaceVariant = Color(0xFF474742),
     onSurfaceVariant = Color(0xFFC8C6C0),
+    secondaryContainer = Color(0xFF474742),
+    onSecondaryContainer = Color(0xFFE3E3DC),
+    outline = Color(0xFF91918A),
+    outlineVariant = Color(0xFF474742),
 )
 
 @Composable
@@ -49,6 +57,10 @@ fun LauncherTheme(preference: ThemePreference, content: @Composable () -> Unit) 
         onSurface = animateColorAsState(target.onSurface, LauncherMotion.color(), label = "Surface text").value,
         surfaceVariant = animateColorAsState(target.surfaceVariant, LauncherMotion.color(), label = "Secondary surface").value,
         onSurfaceVariant = animateColorAsState(target.onSurfaceVariant, LauncherMotion.color(), label = "Secondary text").value,
+        secondaryContainer = animateColorAsState(target.secondaryContainer, LauncherMotion.color(), label = "Selected surface").value,
+        onSecondaryContainer = animateColorAsState(target.onSecondaryContainer, LauncherMotion.color(), label = "Selected text").value,
+        outline = animateColorAsState(target.outline, LauncherMotion.color(), label = "Outline color").value,
+        outlineVariant = animateColorAsState(target.outlineVariant, LauncherMotion.color(), label = "Subtle outline color").value,
     )
     MaterialTheme(
         colorScheme = colors,

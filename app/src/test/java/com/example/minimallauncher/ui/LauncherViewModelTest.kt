@@ -104,10 +104,6 @@ private class FakePreferencesRepository : LauncherPreferencesRepository {
             favoriteAppKeys = emptySet(),
             favoriteAppOrder = emptyList(),
             autoOpenKeyboard = true,
-            doubleTapToLock = false,
-            showStatusBar = true,
-            isIntentionalPilotEnabled = false,
-            intentionalPilotAppKeys = emptySet(),
         ),
     )
     override val preferences: Flow<LauncherPreferences> = state
@@ -117,13 +113,6 @@ private class FakePreferencesRepository : LauncherPreferencesRepository {
     }
 
     override suspend fun setAutoOpenKeyboard(enabled: Boolean) = Unit
-    override suspend fun setDoubleTapToLock(enabled: Boolean) = Unit
-    override suspend fun setAssistantEnabled(enabled: Boolean) {
-        state.value = state.value.copy(isAssistantEnabled = enabled)
-    }
-    override suspend fun setShowStatusBar(enabled: Boolean) = Unit
-    override suspend fun setIntentionalPilotEnabled(enabled: Boolean) = Unit
-    override suspend fun toggleIntentionalPilotApp(appKey: String) = Unit
 
     override suspend fun setTheme(theme: ThemePreference) {
         state.value = state.value.copy(theme = theme)
